@@ -1,0 +1,171 @@
+/* ============================================================================
+   PageSpec Editor - Global Styles
+   ============================================================================ */
+
+/* CSS Variables - Dark Theme (default) */
+:root {
+  /* Background colors */
+  --bg-base: #0d0d0d;
+  --bg-elevated: #141414;
+  --bg-subtle: #1a1a1a;
+  --bg-hover: #222222;
+
+  /* Text colors */
+  --text-primary: #f5f5f5;
+  --text-secondary: #a3a3a3;
+  --text-muted: #666666;
+
+  /* Border colors */
+  --border-subtle: #2a2a2a;
+  --border-strong: #3a3a3a;
+
+  /* Accent colors */
+  --accent-primary: #6366f1;
+  --accent-primary-rgb: 99, 102, 241;
+  --accent-hover: #4f46e5;
+  --accent-subtle: rgba(99, 102, 241, 0.15);
+
+  /* Semantic colors */
+  --success: #22c55e;
+  --success-subtle: rgba(34, 197, 94, 0.15);
+  --warning: #f59e0b;
+  --warning-subtle: rgba(245, 158, 11, 0.15);
+  --danger: #ef4444;
+  --danger-subtle: rgba(239, 68, 68, 0.15);
+
+  /* Typography */
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'SF Mono', Monaco, 'Fira Code', monospace;
+
+  /* Transitions */
+  --transition-fast: 0.1s ease;
+  --transition-normal: 0.15s ease;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+/* Light Theme */
+.light {
+  --bg-base: #ffffff;
+  --bg-elevated: #f8f9fa;
+  --bg-subtle: #f1f3f4;
+  --bg-hover: #e8eaed;
+
+  --text-primary: #1a1a1a;
+  --text-secondary: #5f6368;
+  --text-muted: #9aa0a6;
+
+  --border-subtle: #e0e0e0;
+  --border-strong: #d0d0d0;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.1);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.15);
+}
+
+/* Reset */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+/* Base */
+html,
+body {
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text-primary);
+  background: var(--bg-base);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#app {
+  width: 100%;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-subtle);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--border-strong);
+}
+
+/* Selection */
+::selection {
+  background: var(--accent-subtle);
+  color: var(--accent-primary);
+}
+
+/* Focus */
+:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
+/* Links */
+a {
+  color: var(--accent-primary);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+/* Buttons reset */
+button {
+  font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
+  cursor: pointer;
+}
+
+/* Input reset */
+input,
+select,
+textarea {
+  font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
+}
+
+/* Code */
+code,
+pre {
+  font-family: var(--font-mono);
+}
+
+/* Utility classes */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
