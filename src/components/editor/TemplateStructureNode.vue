@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
-import { usePagesStore, useUIStore } from '@/app/store';
+import { computed } from 'vue';
+import Draggable from 'vuedraggable';
+import { useUIStore } from '@/app/store';
 import { canAddChild, getBlockMeta } from '@/domain/registry';
-import type { LayoutNode, FormField, FormNode } from '@/domain/schema';
+import type { LayoutNode, FormNode } from '@/domain/schema';
 import { GripVertical, Plus } from 'lucide-vue-next';
 
 const props = withDefaults(defineProps<{
@@ -13,7 +14,6 @@ const props = withDefaults(defineProps<{
   showCard: true,
 });
 
-const pagesStore = usePagesStore();
 const uiStore = useUIStore();
 
 defineOptions({ name: 'TemplateStructureNode' });
@@ -22,49 +22,22 @@ const isRoot = computed(() => props.node.type === 'PageRoot');
 const meta = computed(() => getBlockMeta(props.node.type));
 const isSelected = computed(() => uiStore.selectedNodeId === props.node.id);
 const allowChildren = computed(() => meta.value?.allowChildren ?? false);
-const children = computed(() => ('children' in props.node && Array.isArray(props.node.children))
-  ? props.node.children
-  : [],
-);
 const isForm = computed(() => props.node.type === 'Form');
 
-const dragOver = ref(false);
-
-function setDragPayload(e: DragEvent, payload: Record<string, any>) {
-  if (!e.dataTransfer) return;
-  const data = JSON.stringify(payload);
-  e.dataTransfer.setData('application/x-pagespec', data);
-  e.dataTransfer.setData('text/plain', data);
-  e.dataTransfer.effectAllowed = 'move';
-}
-
-function getDragPayload(e: DragEvent): { kind: string; [key: string]: any } | null {
-  const raw = e.dataTransfer?.getData('application/x-pagespec')
-    || e.dataTransfer?.getData('text/plain');
-  if (!raw) return null;
-  try {
-    const data = JSON.parse(raw);
-    if (data && typeof data.kind === 'string') return data;
-  } catch {
-    return null;
+const childrenList = computed<LayoutNode[]>(() => {
+  if (!allowChildren.value) return [];
+  if (!('children' in props.node) || !Array.isArray(props.node.children)) {
+    (props.node as any).children = [];
   }
-  return null;
-}
+  return props.node.children as LayoutNode[];
+});
 
-function onDragStartNode(e: DragEvent) {
-  if (isRoot.value || !props.showCard) return;
-  setDragPayload(e, { kind: 'node', nodeId: props.node.id });
-}
-
-function onDragOver(e: DragEvent) {
-  if (!allowChildren.value && !isForm.value) return;
-  e.preventDefault();
-  dragOver.value = true;
-}
-
-function onDragLeave() {
-  dragOver.value = false;
-}
+const fieldList = computed(() => {
+  if (!isForm.value) return [];
+  const form = props.node as FormNode;
+  if (!Array.isArray(form.fields)) form.fields = [];
+  return form.fields;
+});
 
 function isDescendant(root: LayoutNode, targetId: string): boolean {
   if (root.id === targetId) return true;
@@ -74,91 +47,47 @@ function isDescendant(root: LayoutNode, targetId: string): boolean {
   return false;
 }
 
-function addFieldToForm(fieldType: FormField['type']) {
-  const activePage = pagesStore.activePage;
-  if (!activePage) return;
-
-  const formNode = props.node as FormNode;
-  const fields = Array.isArray(formNode.fields) ? [...formNode.fields] : [];
-  const index = fields.length + 1;
-  const labelMap: Record<string, string> = {
-    input: '输入框',
-    select: '下拉框',
-  };
-  const keyBase = fieldType === 'select' ? 'select' : 'input';
-  const key = `${keyBase}${index}`;
-
-  fields.push({
-    key,
-    label: labelMap[fieldType] || '字段',
-    type: fieldType,
-    required: false,
-    span: 12,
-  });
-
-  pagesStore.updateNode(activePage.id, formNode.id, { fields });
-  uiStore.selectNode(formNode.id);
+function resolveDraggedType(element: any): string | null {
+  if (!element || typeof element !== 'object') return null;
+  if (element.kind === 'palette-block') return element.blockType;
+  if (element.type) return element.type;
+  return null;
 }
 
-function handleDrop(e: DragEvent) {
-  dragOver.value = false;
-  if (!allowChildren.value && !isForm.value) return;
-  e.preventDefault();
+function moveBlock(evt: any) {
+  const dragged = evt.draggedContext?.element;
+  const targetList = evt.relatedContext?.list as LayoutNode[] | undefined;
+  const sourceList = evt.draggedContext?.list as LayoutNode[] | undefined;
+  const parentMeta = meta.value;
+  const childType = resolveDraggedType(dragged);
 
-  const payload = getDragPayload(e);
-  if (!payload) return;
+  if (!allowChildren.value || !childType || !parentMeta) return false;
+  if (props.node.type === 'Tabs' && childType !== 'Tab') return false;
+  if (!canAddChild(props.node.type, childType)) return false;
 
-  const activePage = pagesStore.activePage;
-  if (!activePage) return;
+  if (dragged?.id && isDescendant(dragged as LayoutNode, props.node.id)) return false;
 
-  if (payload.kind === 'field') {
-    if (!isForm.value) {
-      uiStore.showToast('warning', '字段只能拖入表单块');
-      return;
-    }
-    addFieldToForm(payload.fieldType);
-    return;
+  if (parentMeta.maxChildren && targetList && sourceList !== targetList) {
+    if (targetList.length >= parentMeta.maxChildren) return false;
   }
 
-  if (payload.kind === 'block') {
-    if (!allowChildren.value) return;
-    const parentMeta = meta.value;
-    if (!parentMeta) return;
-    if (parentMeta.maxChildren && children.value.length >= parentMeta.maxChildren) {
-      uiStore.showToast('warning', `该容器最多只能添加 ${parentMeta.maxChildren} 个子块`);
-      return;
-    }
-    if (props.node.type === 'Tabs' && payload.blockType !== 'Tab') {
-      uiStore.showToast('warning', 'Tabs 只能添加 Tab');
-      return;
-    }
+  return true;
+}
 
-    const newNode = pagesStore.addNode(activePage.id, props.node.id, payload.blockType, children.value.length);
-    if (newNode) {
-      uiStore.selectNode(newNode.id);
-    }
-    return;
+function onAddBlock(evt: any) {
+  const list = childrenList.value;
+  const added = list[evt.newIndex];
+  if (added?.id) {
+    uiStore.selectNode(added.id);
   }
+}
 
-  if (payload.kind === 'node') {
-    if (!allowChildren.value) return;
-    const dragged = pagesStore.findNode(activePage.root as LayoutNode, payload.nodeId);
-    if (!dragged) return;
-    if (dragged.id === props.node.id) return;
-    if (isDescendant(dragged, props.node.id)) {
-      uiStore.showToast('warning', '不能把父节点拖进自己的子节点');
-      return;
-    }
-    if (props.node.type === 'Tabs' && dragged.type !== 'Tab') {
-      uiStore.showToast('warning', 'Tabs 只能添加 Tab');
-      return;
-    }
-    if (!canAddChild(props.node.type, dragged.type)) {
-      uiStore.showToast('warning', '该容器不允许放入此类型');
-      return;
-    }
-    pagesStore.moveNode(activePage.id, dragged.id, props.node.id, children.value.length);
-    uiStore.selectNode(dragged.id);
+function onAddField(evt: any) {
+  const formNode = props.node as FormNode;
+  const list = formNode.fields || [];
+  const added = list[evt.newIndex];
+  if (added) {
+    uiStore.selectNode(formNode.id);
   }
 }
 
@@ -187,7 +116,7 @@ const summaryText = computed(() => {
     return '树组件';
   }
   if (props.node.type === 'Tabs') {
-    return `Tab ${children.value.length}`;
+    return `Tab ${childrenList.value.length}`;
   }
   if (props.node.type === 'Split') {
     return props.node.direction === 'horizontal' ? '左右分栏' : '上下分栏';
@@ -204,9 +133,7 @@ const summaryText = computed(() => {
     <div
       v-if="showCard"
       class="node-card"
-      :class="{ root: isRoot, dragover: dragOver }"
-      :draggable="!isRoot"
-      @dragstart="onDragStartNode"
+      :class="{ root: isRoot }"
       @click.stop="uiStore.selectNode(node.id)"
     >
       <div class="node-header">
@@ -217,47 +144,56 @@ const summaryText = computed(() => {
       <div class="node-summary">{{ summaryText }}</div>
     </div>
 
-    <div
+    <Draggable
       v-if="allowChildren"
+      :list="childrenList"
+      item-key="id"
+      :group="{ name: 'blocks', pull: true, put: true }"
+      :animation="150"
+      ghost-class="drag-ghost"
+      handle=".drag-handle"
+      :move="moveBlock"
+      @add="onAddBlock"
       class="node-children"
       :class="[layoutClass, { canvas: !showCard }]"
-      @dragover="onDragOver"
-      @dragleave="onDragLeave"
-      @drop="handleDrop"
     >
-      <TemplateStructureNode
-        v-for="child in children"
-        :key="child.id"
-        :node="child"
-        :depth="depth + 1"
-      />
-      <div class="drop-slot">
-        <Plus :size="12" />
-        <span>拖拽组件到此处</span>
-      </div>
-    </div>
+      <template #item="{ element }">
+        <TemplateStructureNode
+          :node="element"
+          :depth="depth + 1"
+        />
+      </template>
+      <template #footer>
+        <div class="drop-slot">
+          <Plus :size="12" />
+          <span>拖拽组件到此处</span>
+        </div>
+      </template>
+    </Draggable>
 
-    <div
+    <Draggable
       v-else-if="isForm"
+      :list="fieldList"
+      item-key="key"
+      :group="{ name: 'fields', pull: true, put: true }"
+      :animation="150"
+      ghost-class="drag-ghost"
+      @add="onAddField"
       class="form-fields"
-      :class="{ dragover: dragOver }"
-      @dragover="onDragOver"
-      @dragleave="onDragLeave"
-      @drop="handleDrop"
     >
-      <div
-        v-for="(field, index) in (node as any).fields || []"
-        :key="field.key + index"
-        class="form-field-chip"
-      >
-        <span>{{ field.label }}</span>
-        <em>{{ field.type }}</em>
-      </div>
-      <div class="drop-slot">
-        <Plus :size="12" />
-        <span>拖拽字段到此处</span>
-      </div>
-    </div>
+      <template #item="{ element }">
+        <div class="form-field-chip">
+          <span>{{ element.label }}</span>
+          <em>{{ element.type }}</em>
+        </div>
+      </template>
+      <template #footer>
+        <div class="drop-slot">
+          <Plus :size="12" />
+          <span>拖拽字段到此处</span>
+        </div>
+      </template>
+    </Draggable>
   </div>
 </template>
 
@@ -280,11 +216,6 @@ const summaryText = computed(() => {
 .node-card.root {
   background: var(--bg-subtle);
   border-style: dashed;
-}
-
-.node-card.dragover {
-  border-color: var(--accent-primary);
-  box-shadow: 0 0 0 2px var(--accent-subtle);
 }
 
 .structure-node.selected > .node-card {
@@ -368,11 +299,6 @@ const summaryText = computed(() => {
   background: rgba(0, 0, 0, 0.02);
 }
 
-.form-fields.dragover {
-  border-color: var(--accent-primary);
-  box-shadow: 0 0 0 2px var(--accent-subtle);
-}
-
 .form-field-chip {
   display: inline-flex;
   align-items: center;
@@ -388,5 +314,9 @@ const summaryText = computed(() => {
 .form-field-chip em {
   font-style: normal;
   color: var(--text-muted);
+}
+
+.drag-ghost {
+  opacity: 0.6;
 }
 </style>

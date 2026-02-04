@@ -1,12 +1,11 @@
 <script setup lang="ts">
 import { computed, watch } from 'vue';
-import { usePagesStore, useUIStore } from '@/app/store';
-import { canAddChild, createBlockNode } from '@/domain/registry';
+import { usePagesStore } from '@/app/store';
+import { createBlockNode } from '@/domain/registry';
 import type { LayoutNode, StackDirection } from '@/domain/schema';
 import TemplateStructureNode from './TemplateStructureNode.vue';
 
 const pagesStore = usePagesStore();
-const uiStore = useUIStore();
 
 const activePage = computed(() => pagesStore.activePage);
 
@@ -54,75 +53,13 @@ function ensureRootContainer(direction?: StackDirection) {
 
 watch(activePage, (page) => {
   if (!page) return;
-  const root = page.root as LayoutNode;
-  if (root.children?.length && !(root.children.length === 1 && root.children[0].type === 'Stack')) {
-    ensureRootContainer();
-  }
+  ensureRootContainer();
 }, { immediate: true });
 
 function setLayout(direction: StackDirection) {
   ensureRootContainer(direction);
 }
 
-function getDragPayload(e: DragEvent): { kind: string; [key: string]: any } | null {
-  const raw = e.dataTransfer?.getData('application/x-pagespec')
-    || e.dataTransfer?.getData('text/plain');
-  if (!raw) return null;
-  try {
-    const data = JSON.parse(raw);
-    if (data && typeof data.kind === 'string') return data;
-  } catch {
-    return null;
-  }
-  return null;
-}
-
-function onRootDragOver(e: DragEvent) {
-  if (!rootContainer.value) {
-    e.preventDefault();
-  }
-}
-
-function onRootDrop(e: DragEvent) {
-  e.preventDefault();
-  if (rootContainer.value) return;
-  const payload = getDragPayload(e);
-  if (!payload) return;
-
-  const page = activePage.value;
-  if (!page) return;
-
-  if (payload.kind === 'field') {
-    uiStore.showToast('warning', '字段只能拖入表单块');
-    return;
-  }
-
-  const container = ensureRootContainer();
-  if (!container) return;
-
-  if (payload.kind === 'block') {
-    if (!canAddChild(container.type, payload.blockType)) {
-      uiStore.showToast('warning', '该容器不允许放入此类型');
-      return;
-    }
-    const newNode = pagesStore.addNode(page.id, container.id, payload.blockType);
-    if (newNode) {
-      uiStore.selectNode(newNode.id);
-    }
-    return;
-  }
-
-  if (payload.kind === 'node') {
-    const dragged = pagesStore.findNode(page.root as LayoutNode, payload.nodeId);
-    if (!dragged) return;
-    if (!canAddChild(container.type, dragged.type)) {
-      uiStore.showToast('warning', '该容器不允许放入此类型');
-      return;
-    }
-    pagesStore.moveNode(page.id, dragged.id, container.id, (container as any).children?.length || 0);
-    uiStore.selectNode(dragged.id);
-  }
-}
 </script>
 
 <template>
@@ -152,17 +89,12 @@ function onRootDrop(e: DragEvent) {
         </button>
       </div>
 
-      <div class="structure-dropzone" @dragover="onRootDragOver" @drop="onRootDrop">
-        <TemplateStructureNode
-          v-if="rootContainer"
-          :node="rootContainer"
-          :depth="0"
-          :show-card="false"
-        />
-        <div v-else class="empty-drop">
-          拖拽组件到这里
-        </div>
-      </div>
+      <TemplateStructureNode
+        v-if="rootContainer"
+        :node="rootContainer"
+        :depth="0"
+        :show-card="false"
+      />
     </div>
   </div>
 </template>
@@ -208,17 +140,6 @@ function onRootDrop(e: DragEvent) {
   border-color: var(--accent-primary);
 }
 
-.structure-dropzone {
-  flex: 1;
-}
-
-.empty-drop {
-  border: 1px dashed var(--border-subtle);
-  border-radius: 12px;
-  padding: 24px;
-  color: var(--text-muted);
-  text-align: center;
-}
 
 .empty-state {
   flex: 1;

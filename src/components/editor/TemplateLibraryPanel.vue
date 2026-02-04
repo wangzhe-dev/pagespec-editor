@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { computed } from 'vue';
+import { nanoid } from 'nanoid';
+import Draggable from 'vuedraggable';
 import { usePagesStore, useUIStore } from '@/app/store';
 import { createBlockNode } from '@/domain/registry';
-import type { LayoutNode } from '@/domain/schema';
+import type { FormField, LayoutNode } from '@/domain/schema';
 import { FileText, Layers, ChevronRight } from 'lucide-vue-next';
 
 type TemplateId = 'filter-table';
@@ -18,14 +20,28 @@ const templates = [
   },
 ];
 
-const containerPalette = [
-  { id: 'stack', label: '行列容器', blockType: 'Stack' as const },
-  { id: 'card', label: '卡片容器', blockType: 'Card' as const },
+type PaletteBlock = {
+  id: string;
+  label: string;
+  blockType: 'Stack' | 'Card';
+  kind: 'palette-block';
+};
+
+type PaletteField = {
+  id: string;
+  label: string;
+  fieldType: 'input' | 'select';
+  kind: 'palette-field';
+};
+
+const containerPalette: PaletteBlock[] = [
+  { id: 'stack', label: '行列容器', blockType: 'Stack', kind: 'palette-block' },
+  { id: 'card', label: '卡片容器', blockType: 'Card', kind: 'palette-block' },
 ];
 
-const fieldPalette = [
-  { id: 'input', label: '输入框', fieldType: 'input' as const },
-  { id: 'select', label: '下拉框', fieldType: 'select' as const },
+const fieldPalette: PaletteField[] = [
+  { id: 'input', label: '输入框', fieldType: 'input', kind: 'palette-field' },
+  { id: 'select', label: '下拉框', fieldType: 'select', kind: 'palette-field' },
 ];
 
 const activePageName = computed(() => pagesStore.activePage?.name ?? '未创建');
@@ -51,20 +67,18 @@ function applyTemplate(templateId: TemplateId) {
   uiStore.selectNode(form.id);
 }
 
-function setDragPayload(e: DragEvent, payload: Record<string, any>) {
-  if (!e.dataTransfer) return;
-  const data = JSON.stringify(payload);
-  e.dataTransfer.setData('application/x-pagespec', data);
-  e.dataTransfer.setData('text/plain', data);
-  e.dataTransfer.effectAllowed = 'copy';
+function cloneBlock(item: PaletteBlock): LayoutNode {
+  return createBlockNode(item.blockType);
 }
 
-function onDragStartContainer(e: DragEvent, blockType: string) {
-  setDragPayload(e, { kind: 'block', blockType });
-}
-
-function onDragStartField(e: DragEvent, fieldType: string) {
-  setDragPayload(e, { kind: 'field', fieldType });
+function cloneField(item: PaletteField): FormField {
+  return {
+    key: `${item.fieldType}-${nanoid(6)}`,
+    label: item.label,
+    type: item.fieldType,
+    required: false,
+    span: 12,
+  };
 }
 </script>
 
@@ -98,34 +112,40 @@ function onDragStartField(e: DragEvent, fieldType: string) {
 
     <div class="palette-section">
       <div class="palette-title">容器组件</div>
-      <div class="palette-list">
-        <div
-          v-for="item in containerPalette"
-          :key="item.id"
-          class="palette-item"
-          draggable="true"
-          @dragstart="onDragStartContainer($event, item.blockType)"
-        >
-          <Layers :size="14" />
-          <span>{{ item.label }}</span>
-        </div>
-      </div>
+      <Draggable
+        :list="containerPalette"
+        :sort="false"
+        item-key="id"
+        :group="{ name: 'blocks', pull: 'clone', put: false }"
+        :clone="cloneBlock"
+        class="palette-list"
+      >
+        <template #item="{ element }">
+          <div class="palette-item">
+            <Layers :size="14" />
+            <span>{{ element.label }}</span>
+          </div>
+        </template>
+      </Draggable>
     </div>
 
     <div class="palette-section">
       <div class="palette-title">字段组件</div>
-      <div class="palette-list">
-        <div
-          v-for="item in fieldPalette"
-          :key="item.id"
-          class="palette-item"
-          draggable="true"
-          @dragstart="onDragStartField($event, item.fieldType)"
-        >
-          <span class="field-dot" />
-          <span>{{ item.label }}</span>
-        </div>
-      </div>
+      <Draggable
+        :list="fieldPalette"
+        :sort="false"
+        item-key="id"
+        :group="{ name: 'fields', pull: 'clone', put: false }"
+        :clone="cloneField"
+        class="palette-list"
+      >
+        <template #item="{ element }">
+          <div class="palette-item">
+            <span class="field-dot" />
+            <span>{{ element.label }}</span>
+          </div>
+        </template>
+      </Draggable>
       <div class="palette-hint">拖拽到中间结构视图中的表单块</div>
     </div>
 
