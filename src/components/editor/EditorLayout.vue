@@ -1,15 +1,12 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import { usePagesStore, useProfilesStore, useUIStore } from '@/app/store';
-import PageListPanel from './PageListPanel.vue';
-import LayoutTreeEditor from './LayoutTreeEditor.vue';
+import { usePagesStore, useUIStore } from '@/app/store';
+import TemplateLibraryPanel from './TemplateLibraryPanel.vue';
+import TemplateStructureView from './TemplateStructureView.vue';
 import PropertyInspector from './PropertyInspector.vue';
 import PromptPreviewDock from './PromptPreviewDock.vue';
 import EditorToolbar from './EditorToolbar.vue';
 import { 
-  PanelLeft, 
-  PanelRight, 
-  PanelBottom, 
   ChevronLeft,
   ChevronRight,
   ChevronDown,
@@ -17,7 +14,6 @@ import {
 } from 'lucide-vue-next';
 
 const pagesStore = usePagesStore();
-const profilesStore = useProfilesStore();
 const uiStore = useUIStore();
 
 // 面板状态
@@ -110,15 +106,7 @@ function toggleLeftPanel() {
         class="editor-left"
         :style="{ width: uiStore.panelSizes.leftWidth + 'px' }"
       >
-        <PageListPanel 
-          v-if="uiStore.panelVisibility.pages"
-          class="panel-section" 
-        />
-        <div class="panel-divider" v-if="uiStore.panelVisibility.pages && uiStore.panelVisibility.tree" />
-        <LayoutTreeEditor 
-          v-if="uiStore.panelVisibility.tree"
-          class="panel-section flex-1" 
-        />
+        <TemplateLibraryPanel class="panel-section flex-1" />
         
         <!-- Left resize handle -->
         <div 
@@ -137,21 +125,9 @@ function toggleLeftPanel() {
         <ChevronRight v-else :size="16" />
       </button>
       
-      <!-- Center (Canvas / Preview placeholder) -->
+      <!-- Center (Structure View) -->
       <main class="editor-center">
-        <div v-if="!pagesStore.activePage" class="empty-state">
-          <div class="empty-state-content">
-            <div class="empty-icon">📄</div>
-            <h3>选择或创建页面</h3>
-            <p>从左侧面板选择一个页面开始编辑</p>
-          </div>
-        </div>
-        <div v-else class="canvas-placeholder">
-          <div class="canvas-info">
-            <h2>{{ pagesStore.activePage.name }}</h2>
-            <p class="canvas-hint">在左侧布局树中编辑页面结构，在右侧属性面板中配置节点属性</p>
-          </div>
-        </div>
+        <TemplateStructureView />
         
         <!-- Bottom Panel -->
         <div 
@@ -354,60 +330,6 @@ function toggleLeftPanel() {
   transform: translateX(-50%);
   border-bottom: none;
   border-radius: 4px 4px 0 0;
-}
-
-.empty-state {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.empty-state-content {
-  text-align: center;
-  color: var(--text-muted);
-}
-
-.empty-icon {
-  font-size: 48px;
-  margin-bottom: 16px;
-}
-
-.empty-state-content h3 {
-  font-size: 18px;
-  font-weight: 500;
-  color: var(--text-secondary);
-  margin-bottom: 8px;
-}
-
-.empty-state-content p {
-  font-size: 14px;
-}
-
-.canvas-placeholder {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 24px;
-}
-
-.canvas-info {
-  text-align: center;
-  max-width: 400px;
-}
-
-.canvas-info h2 {
-  font-size: 24px;
-  font-weight: 600;
-  color: var(--text-primary);
-  margin-bottom: 8px;
-}
-
-.canvas-hint {
-  font-size: 14px;
-  color: var(--text-muted);
-  line-height: 1.5;
 }
 
 .flex-1 {
