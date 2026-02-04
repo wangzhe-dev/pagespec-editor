@@ -99,7 +99,9 @@ export const useUIStore = defineStore('ui', () => {
 
   function setTheme(newTheme: 'light' | 'dark'): void {
     theme.value = newTheme;
-    document.documentElement.classList.toggle('dark', newTheme === 'dark');
+    const root = document.documentElement;
+    root.classList.toggle('light', newTheme === 'light');
+    root.classList.toggle('dark', newTheme === 'dark');
   }
 
   function hideWelcome(): void {

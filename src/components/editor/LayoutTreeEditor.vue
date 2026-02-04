@@ -3,11 +3,10 @@ import { computed, ref } from 'vue';
 import { usePagesStore, useUIStore } from '@/app/store';
 import { getBlocksByCategory, getBlockMeta } from '@/domain/registry';
 import type { LayoutNode } from '@/domain/schema';
-import { 
+import {
   ChevronRight, 
   ChevronDown, 
   Plus, 
-  Trash2,
   FileText,
   Columns,
   Layers,
@@ -21,6 +20,7 @@ import {
   BarChart3,
   Puzzle,
 } from 'lucide-vue-next';
+import ChildNodes from './LayoutTreeEditorChildNodes.vue';
 
 const pagesStore = usePagesStore();
 const uiStore = useUIStore();
@@ -231,136 +231,14 @@ if (activePage.value) {
     </div>
   </div>
 </template>
-
-<!-- Child nodes component for recursion -->
-<script lang="ts">
-import { defineComponent, PropType } from 'vue';
-
-const ChildNodes = defineComponent({
-  name: 'ChildNodes',
-  props: {
-    nodes: { type: Array as PropType<LayoutNode[]>, required: true },
-    depth: { type: Number, required: true },
-    expandedNodes: { type: Object as PropType<Set<string>>, required: true },
-    selectedNodeId: { type: String as PropType<string | null>, default: null },
-    showAddMenu: { type: String as PropType<string | null>, default: null },
-    blockCategories: { type: Array as PropType<any[]>, required: true },
-    getIcon: { type: Function, required: true },
-    canHaveChildren: { type: Function, required: true },
-    hasChildren: { type: Function, required: true },
-    getNodeLabel: { type: Function, required: true },
-  },
-  emits: ['toggle-expand', 'select-node', 'toggle-add-menu', 'add-node', 'delete-node'],
-  components: { ChevronRight, ChevronDown, Plus, Trash2 },
-});
-</script>
-
-<template>
-  <component :is="ChildNodes" v-bind="$props">
-    <template v-for="node in nodes" :key="node.id">
-      <div class="tree-node-wrapper">
-        <div 
-          class="tree-node"
-          :class="{ 
-            selected: node.id === selectedNodeId,
-            'has-children': hasChildren(node),
-          }"
-          :style="{ paddingLeft: (depth * 16 + 12) + 'px' }"
-          @click.stop="$emit('select-node', node.id)"
-        >
-          <button 
-            v-if="hasChildren(node)"
-            class="expand-btn"
-            @click.stop="$emit('toggle-expand', node.id)"
-          >
-            <ChevronDown v-if="expandedNodes.has(node.id)" :size="14" />
-            <ChevronRight v-else :size="14" />
-          </button>
-          <span v-else class="expand-placeholder" />
-          
-          <component 
-            :is="getIcon(getBlockMeta(node.type)?.icon || 'Square')" 
-            :size="14" 
-            class="node-icon"
-          />
-          
-          <span class="node-label">{{ getNodeLabel(node) }}</span>
-          <span class="node-type">({{ node.type }})</span>
-          
-          <div class="node-actions">
-            <button 
-              v-if="canHaveChildren(node)"
-              class="action-btn add"
-              @click.stop="$emit('toggle-add-menu', node.id, $event)"
-              title="添加子节点"
-            >
-              <Plus :size="12" />
-            </button>
-            <button 
-              class="action-btn delete"
-              @click.stop="$emit('delete-node', node.id, $event)"
-              title="删除节点"
-            >
-              <Trash2 :size="12" />
-            </button>
-          </div>
-          
-          <div 
-            v-if="showAddMenu === node.id" 
-            class="add-menu"
-            @click.stop
-          >
-            <div 
-              v-for="category in blockCategories" 
-              :key="category.key"
-              class="add-menu-category"
-            >
-              <div class="category-label">{{ category.label }}</div>
-              <button 
-                v-for="block in category.blocks"
-                :key="block.type"
-                class="add-menu-item"
-                @click="$emit('add-node', node.id, block.type)"
-              >
-                <component :is="getIcon(block.icon)" :size="14" />
-                <span>{{ block.label }}</span>
-              </button>
-            </div>
-          </div>
-        </div>
-        
-        <template v-if="expandedNodes.has(node.id) && hasChildren(node)">
-          <ChildNodes 
-            :nodes="node.children"
-            :depth="depth + 1"
-            :expanded-nodes="expandedNodes"
-            :selected-node-id="selectedNodeId"
-            :show-add-menu="showAddMenu"
-            :block-categories="blockCategories"
-            :get-icon="getIcon"
-            :can-have-children="canHaveChildren"
-            :has-children="hasChildren"
-            :get-node-label="getNodeLabel"
-            @toggle-expand="$emit('toggle-expand', $event)"
-            @select-node="$emit('select-node', $event)"
-            @toggle-add-menu="(id, e) => $emit('toggle-add-menu', id, e)"
-            @add-node="(p, t) => $emit('add-node', p, t)"
-            @delete-node="(id, e) => $emit('delete-node', id, e)"
-          />
-        </template>
-      </div>
-    </template>
-  </component>
-</template>
-
-<style scoped>
+<style>
 .layout-tree-editor {
   display: flex;
   flex-direction: column;
   height: 100%;
 }
 
-.panel-header {
+.layout-tree-editor .panel-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -369,7 +247,7 @@ const ChildNodes = defineComponent({
   flex-shrink: 0;
 }
 
-.panel-title {
+.layout-tree-editor .panel-title {
   font-size: 12px;
   font-weight: 600;
   text-transform: uppercase;
@@ -377,7 +255,7 @@ const ChildNodes = defineComponent({
   color: var(--text-muted);
 }
 
-.empty-tree {
+.layout-tree-editor .empty-tree {
   flex: 1;
   display: flex;
   align-items: center;
@@ -386,17 +264,17 @@ const ChildNodes = defineComponent({
   font-size: 13px;
 }
 
-.tree-container {
+.layout-tree-editor .tree-container {
   flex: 1;
   overflow: auto;
   padding: 8px 0;
 }
 
-.tree-node-wrapper {
+.layout-tree-editor .tree-node-wrapper {
   position: relative;
 }
 
-.tree-node {
+.layout-tree-editor .tree-node {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -406,15 +284,15 @@ const ChildNodes = defineComponent({
   position: relative;
 }
 
-.tree-node:hover {
+.layout-tree-editor .tree-node:hover {
   background: var(--bg-hover);
 }
 
-.tree-node.selected {
+.layout-tree-editor .tree-node.selected {
   background: var(--accent-subtle);
 }
 
-.expand-btn {
+.layout-tree-editor .expand-btn {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -428,26 +306,26 @@ const ChildNodes = defineComponent({
   flex-shrink: 0;
 }
 
-.expand-btn:hover {
+.layout-tree-editor .expand-btn:hover {
   background: var(--bg-subtle);
   color: var(--text-primary);
 }
 
-.expand-placeholder {
+.layout-tree-editor .expand-placeholder {
   width: 18px;
   flex-shrink: 0;
 }
 
-.node-icon {
+.layout-tree-editor .node-icon {
   color: var(--text-muted);
   flex-shrink: 0;
 }
 
-.tree-node.selected .node-icon {
+.layout-tree-editor .tree-node.selected .node-icon {
   color: var(--accent-primary);
 }
 
-.node-label {
+.layout-tree-editor .node-label {
   font-size: 13px;
   color: var(--text-primary);
   white-space: nowrap;
@@ -455,13 +333,13 @@ const ChildNodes = defineComponent({
   text-overflow: ellipsis;
 }
 
-.node-type {
+.layout-tree-editor .node-type {
   font-size: 11px;
   color: var(--text-muted);
   flex-shrink: 0;
 }
 
-.node-actions {
+.layout-tree-editor .node-actions {
   display: flex;
   gap: 2px;
   margin-left: auto;
@@ -469,11 +347,11 @@ const ChildNodes = defineComponent({
   transition: opacity 0.1s;
 }
 
-.tree-node:hover .node-actions {
+.layout-tree-editor .tree-node:hover .node-actions {
   opacity: 1;
 }
 
-.action-btn {
+.layout-tree-editor .action-btn {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -486,21 +364,21 @@ const ChildNodes = defineComponent({
   cursor: pointer;
 }
 
-.action-btn:hover {
+.layout-tree-editor .action-btn:hover {
   background: var(--bg-subtle);
 }
 
-.action-btn.add:hover {
+.layout-tree-editor .action-btn.add:hover {
   background: var(--accent-subtle);
   color: var(--accent-primary);
 }
 
-.action-btn.delete:hover {
+.layout-tree-editor .action-btn.delete:hover {
   background: var(--danger-subtle);
   color: var(--danger);
 }
 
-.add-menu {
+.layout-tree-editor .add-menu {
   position: absolute;
   top: 100%;
   left: 50%;
@@ -516,15 +394,15 @@ const ChildNodes = defineComponent({
   overflow: auto;
 }
 
-.add-menu-category {
+.layout-tree-editor .add-menu-category {
   margin-bottom: 8px;
 }
 
-.add-menu-category:last-child {
+.layout-tree-editor .add-menu-category:last-child {
   margin-bottom: 0;
 }
 
-.category-label {
+.layout-tree-editor .category-label {
   font-size: 10px;
   font-weight: 600;
   text-transform: uppercase;
@@ -532,7 +410,7 @@ const ChildNodes = defineComponent({
   padding: 4px 8px;
 }
 
-.add-menu-item {
+.layout-tree-editor .add-menu-item {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -547,7 +425,7 @@ const ChildNodes = defineComponent({
   text-align: left;
 }
 
-.add-menu-item:hover {
+.layout-tree-editor .add-menu-item:hover {
   background: var(--accent-subtle);
   color: var(--accent-primary);
 }
