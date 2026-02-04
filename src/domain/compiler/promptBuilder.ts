@@ -75,29 +75,6 @@ export function generateDSL(node: LayoutNode, indent: number = 0): string {
         .join('\n');
       return `PageRoot("${node.title}")\n${rootChildren}`;
 
-    case 'Split': {
-      const dir = node.direction === 'horizontal' ? 'H' : 'V';
-      const sizes = node.sizes?.join(',') || '50,50';
-      const children = (node.children || [])
-        .map((c, i) => {
-          const label = node.direction === 'horizontal' 
-            ? (i === 0 ? 'L' : 'R') 
-            : (i === 0 ? 'T' : 'B');
-          return `${pad}  ${label}=${generateDSL(c, 0).trim()}`;
-        })
-        .join('\n');
-      return `${pad}Split${dir}(${sizes})\n${children}`;
-    }
-
-    case 'Stack': {
-      const dir = node.direction === 'row' ? 'Row' : 'Col';
-      const gap = node.gap || 0;
-      const children = (node.children || [])
-        .map(c => `${pad}  ${generateDSL(c, 0).trim()}`)
-        .join('\n');
-      return `${pad}Stack${dir}(gap=${gap})\n${children}`;
-    }
-
     case 'Tabs': {
       const tabs = (node.children || [])
         .map(tab => {
@@ -112,6 +89,31 @@ export function generateDSL(node: LayoutNode, indent: number = 0): string {
 
     case 'Tab':
       return `Tab("${node.title}")`;
+
+    case 'Grid': {
+      const cols = node.columns ?? 2;
+      const gapValue = typeof node.gap === 'number'
+        ? node.gap
+        : node.gap
+          ? `${node.gap.row}/${node.gap.col}`
+          : undefined;
+      const props: string[] = [`cols=${cols}`];
+      if (gapValue !== undefined) props.push(`gap=${gapValue}`);
+      const children = (node.children || [])
+        .map((c, i) => `${pad}  C${i + 1}=${generateDSL(c, 0).trim()}`)
+        .join('\n');
+      return `${pad}Grid(${props.join(', ')})${children ? `\n${children}` : ''}`;
+    }
+
+    case 'GridCell': {
+      const span = `${node.colSpan || 1}x${node.rowSpan || 1}`;
+      const label = node.label ? `"${node.label}"` : '';
+      const header = label ? `Cell(${label}, span=${span})` : `Cell(span=${span})`;
+      const children = (node.children || [])
+        .map(c => `${pad}  ${generateDSL(c, 0).trim()}`)
+        .join('\n');
+      return `${pad}${header}${children ? `\n${children}` : ''}`;
+    }
 
     case 'Table': {
       const cols = (node.columns || []).map(c => c.key).join(',');
@@ -388,13 +390,6 @@ function detectWarnings(pageSpec: PageSpec, nodeMap: Map<string, LayoutNode>): s
       const form = node as FormNode;
       if (!form.fields || form.fields.length === 0) {
         warnings.push(`表单【${node.label || node.id}】缺少字段配置`);
-      }
-    }
-
-    // Split 检查
-    if (node.type === 'Split') {
-      if (!node.children || node.children.length < 2) {
-        warnings.push(`分割布局【${node.label || node.id}】子节点不足（至少需要 2 个）`);
       }
     }
 

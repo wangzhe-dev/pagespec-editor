@@ -2,7 +2,7 @@
 import { usePagesStore } from '@/app/store';
 import { createBlockNode } from '@/domain/registry';
 import type { LayoutNode } from '@/domain/schema';
-import { computed, watch } from 'vue';
+import { computed, watchEffect } from 'vue';
 import TemplateStructureNode from './TemplateStructureNode.vue';
 
 const pagesStore = usePagesStore();
@@ -14,10 +14,19 @@ const rootContainer = computed(() => {
   const page = activePage.value;
   if (!page) return null;
   const root = page.root as LayoutNode;
-  if (root.children?.length > 0) {
+  if (!Array.isArray(root.children)) {
+    root.children = [];
+  }
+  if (root.children.length > 0) {
     return root.children[0] as LayoutNode;
   }
   return null;
+});
+
+const canvasNode = computed(() => {
+  const page = activePage.value;
+  if (!page) return null;
+  return rootContainer.value || (page.root as LayoutNode);
 });
 
 // 确保有默认的根容器结构
@@ -38,10 +47,10 @@ function ensureDefaultStructure() {
   page.updatedAt = Date.now();
 }
 
-watch(activePage, (page) => {
-  if (!page) return;
+watchEffect(() => {
+  if (!activePage.value) return;
   ensureDefaultStructure();
-}, { immediate: true });
+});
 </script>
 
 <template>
@@ -56,8 +65,8 @@ watch(activePage, (page) => {
 
     <div v-else class="structure-canvas">
       <TemplateStructureNode
-        v-if="rootContainer"
-        :node="rootContainer"
+        v-if="canvasNode"
+        :node="canvasNode"
         :depth="0"
         :show-card="false"
       />
@@ -71,6 +80,7 @@ watch(activePage, (page) => {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  min-height: 0;
 }
 
 .structure-canvas {
@@ -79,6 +89,7 @@ watch(activePage, (page) => {
   padding: 16px 20px 32px;
   display: flex;
   flex-direction: column;
+  min-height: 0;
 }
 
 .empty-state {

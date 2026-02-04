@@ -11,7 +11,7 @@ import { nanoid } from 'nanoid';
 // Recipe 元数据类型
 // ============================================================================
 
-export interface RecipeMeta {
+interface RecipeMeta {
   type: RecipeType;
   label: string;
   icon: string;
@@ -23,7 +23,7 @@ export interface RecipeMeta {
   dslTemplate: string;        // DSL 模板
 }
 
-export interface RecipeParam {
+interface RecipeParam {
   key: string;
   label: string;
   type: 'text' | 'select' | 'boolean';
@@ -180,7 +180,7 @@ recipeRegistry.set('Custom', {
 // Recipe 编译器
 // ============================================================================
 
-export interface CompiledRecipe {
+interface CompiledRecipe {
   prompt: string;
   dsl: string;
   warnings: string[];

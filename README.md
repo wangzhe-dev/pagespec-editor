@@ -44,9 +44,9 @@ src/
 1. **结构归一化**: 布局树 → 短 DSL
    ```
    PageRoot("用户管理")
-     SplitH(280,flex)
-       L=Tree#tree1(search)
-       R=Tabs{list:Table#userTable(cols=[name,age,status])}
+     Grid(cols=2, gap=16)
+       C1=Tree#tree1(search)
+       C2=Tabs{list:Table#userTable(cols=[name,age,status])}
    ```
 
 2. **规则注入**: 组件映射 + 禁止规则 → 强约束句式
@@ -97,7 +97,7 @@ npm run build
 ### 2. 添加节点
 
 选择父节点，点击 `+` 按钮从分类菜单中添加子节点：
-- **布局**: Split（分割）、Stack（堆叠）
+- **布局**: Grid（栅格）、GridCell（单元格）
 - **容器**: Tabs（标签页）、Card（卡片）
 - **数据**: Table（表格）、Tree（树形）
 - **表单**: Form（表单）

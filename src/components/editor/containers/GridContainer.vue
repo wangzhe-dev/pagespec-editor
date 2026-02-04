@@ -70,6 +70,7 @@ const gridStyle = computed(() => {
     display: 'grid',
     gridTemplateColumns,
     gridTemplateRows,
+    gridAutoRows: 'minmax(140px, auto)',
     gap: gapValue,
     alignItems: 'stretch',
   };

@@ -103,22 +103,6 @@ const formFieldsRequired: LintRule = (node, path) => {
   return [];
 };
 
-const splitMinChildren: LintRule = (node, path) => {
-  if (node.type !== 'Split') return [];
-  
-  if (!node.children || node.children.length < 2) {
-    return [{
-      severity: 'error',
-      code: 'SPLIT_MIN_CHILDREN',
-      message: `分割布局【${node.label || node.id}】子节点不足`,
-      path,
-      nodeId: node.id,
-      suggestion: '分割布局至少需要 2 个子节点',
-    }];
-  }
-  return [];
-};
-
 const tabsNotEmpty: LintRule = (node, path) => {
   if (node.type !== 'Tabs') return [];
   
@@ -254,7 +238,6 @@ const nodeRules: LintRule[] = [
   tableColumnsRequired,
   tableFiltersInColumns,
   formFieldsRequired,
-  splitMinChildren,
   tabsNotEmpty,
   tabKeyRequired,
   tabContentNotEmpty,

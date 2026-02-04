@@ -104,17 +104,6 @@ function onAddField(evt: any) {
   }
 }
 
-const layoutClass = computed(() => {
-  if (props.node.type === 'Split') {
-    return props.node.direction === 'horizontal' ? 'layout-row' : 'layout-column';
-  }
-  if (props.node.type === 'Stack') {
-    return props.node.direction === 'row' ? 'layout-row' : 'layout-column';
-  }
-  if (props.node.type === 'Tabs') return 'layout-row';
-  return 'layout-column';
-});
-
 const summaryText = computed(() => {
   if (props.node.type === 'Table') {
     const cols = (props.node as any).columns?.length || 0;
@@ -130,12 +119,6 @@ const summaryText = computed(() => {
   }
   if (props.node.type === 'Tabs') {
     return `Tab ${childrenList.value.length}`;
-  }
-  if (props.node.type === 'Split') {
-    return props.node.direction === 'horizontal' ? '左右分栏' : '上下分栏';
-  }
-  if (props.node.type === 'Stack') {
-    return props.node.direction === 'row' ? '水平堆叠' : '垂直堆叠';
   }
   if (props.node.type === 'Grid') {
     const cols = (props.node as any).columns || 3;
@@ -267,8 +250,8 @@ function deleteNode() {
         handle=".drag-handle"
         :move="moveBlock"
         @add="onAddBlock"
-        class="node-children"
-        :class="[layoutClass, { canvas: !showCard }]"
+        class="node-children layout-column"
+        :class="{ canvas: !showCard }"
       >
         <template #item="{ element }">
           <TemplateStructureNode
@@ -277,7 +260,7 @@ function deleteNode() {
           />
         </template>
         <template #footer>
-          <div class="drop-slot">
+          <div class="drop-slot" :class="{ empty: childrenList.length === 0 }">
             <Plus :size="12" />
             <span>拖拽组件到此处</span>
           </div>
@@ -301,7 +284,7 @@ function deleteNode() {
           </div>
         </template>
         <template #footer>
-          <div class="drop-slot">
+          <div class="drop-slot" :class="{ empty: fieldList.length === 0 }">
             <Plus :size="12" />
             <span>拖拽字段到此处</span>
           </div>
@@ -369,17 +352,18 @@ function deleteNode() {
 
 .node-children {
   display: flex;
+  align-items: stretch;
   gap: 10px;
   padding: 12px;
   border: 1px dashed var(--border-subtle);
   border-radius: 10px;
   background: rgba(0, 0, 0, 0.02);
-  min-height: 80px;
+  min-height: 120px;
 }
 
 .node-children.canvas {
   padding: 16px;
-  min-height: 260px;
+  min-height: 320px;
   background: var(--bg-subtle);
   border-style: solid;
 }
@@ -388,19 +372,23 @@ function deleteNode() {
   flex-direction: column;
 }
 
-.node-children.layout-row {
-  flex-direction: row;
-}
 
 .drop-slot {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
   padding: 8px 10px;
   border-radius: 8px;
   border: 1px dashed var(--border-subtle);
   color: var(--text-muted);
   font-size: 11px;
+}
+
+.drop-slot.empty {
+  flex: 1;
+  width: 100%;
+  min-height: 140px;
 }
 
 .form-fields {

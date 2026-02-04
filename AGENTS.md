@@ -2,7 +2,7 @@
 
 这是一个面向前端开发者的工具：AI 页面约束 / 话术生成器。我在真实项目中经常用 Codex / Cursor / Copilot 等 agent 通过“截图 + 一句话”生成页面，但复杂页面（上下左右多区域、每块组件不同、带联动/弹框/主从表等）非常容易跑偏：AI 会脑补样式、混用原生标签和项目 UI 组件、目录结构不符合项目习惯、遗漏交互联动，导致我需要大量返工。本项目的目标不是“用 AI 自动写代码”，而是把我脑子里对页面的结构与约束，变成一个 结构化 PageSpec（页面规格），并由 **Prompt Builder（话术编译器）**输出一段 agent 最容易理解且不易跑偏的“强约束话术”，让我一键复制粘贴到 agent 对话框中执行，从而显著降低复杂页面生成后的返工成本。
 
-本工具的核心工作流非常明确：用户在工具中用最快方式配置页面骨架（布局树：Split/Stack/Tabs 等）、各区域使用的组件块（Table/Tree/Form/Card/Dialog/Drawer/Chart…）、字段信息（columns/filters/formFields）、交互联动（通过预置 Recipe 选择：Tree.select→reload、Master.rowClick→load detail、Search→reload&reset 等）、以及项目级组件映射与约束（ProjectProfile：每个 BlockType 对应项目中的组件别名/路径、禁止原生标签、禁止引入新 UI 库、样式极简仅布局间距、目录命名规范等）。然后 Prompt Builder 将 PageSpec + ProjectProfile 编译成两部分输出：短 DSL（结构骨架）+ 强约束自然语言（规则/交付/联动/字段），并提供短/长两种话术版本以及批量（Batch Manifest）输出。工具本身不负责生成业务代码；真正的页面代码由外部 agent 执行话术生成。
+本工具的核心工作流非常明确：用户在工具中用最快方式配置页面骨架（布局树：Grid/Tabs 等）、各区域使用的组件块（Table/Tree/Form/Card/Dialog/Drawer/Chart…）、字段信息（columns/filters/formFields）、交互联动（通过预置 Recipe 选择：Tree.select→reload、Master.rowClick→load detail、Search→reload&reset 等）、以及项目级组件映射与约束（ProjectProfile：每个 BlockType 对应项目中的组件别名/路径、禁止原生标签、禁止引入新 UI 库、样式极简仅布局间距、目录命名规范等）。然后 Prompt Builder 将 PageSpec + ProjectProfile 编译成两部分输出：短 DSL（结构骨架）+ 强约束自然语言（规则/交付/联动/字段），并提供短/长两种话术版本以及批量（Batch Manifest）输出。工具本身不负责生成业务代码；真正的页面代码由外部 agent 执行话术生成。
 
 为了可维护与可扩展，本项目采用三层分离：
 	•	Schema（数据层）：定义 PageSpec / ProjectProfile / Registry / Recipe 等可序列化结构，必须带 schemaVersion 并支持 migrations，保证未来升级不破坏旧数据；

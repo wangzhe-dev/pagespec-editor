@@ -15,13 +15,10 @@ export const SCHEMA_VERSION = 1;
 // 唯一标识符
 export type NodeId = string;
 export type BlockType =
-  | 'PageRoot' | 'Split' | 'Stack' | 'Tabs' | 'Tab'
+  | 'PageRoot' | 'Tabs' | 'Tab'
   | 'Grid' | 'GridCell'  // Grid 栅格布局
   | 'Table' | 'Tree' | 'Form' | 'Card' | 'Dialog' | 'Drawer'
   | 'Chart' | 'Custom';
-
-export type SplitDirection = 'horizontal' | 'vertical';
-export type StackDirection = 'row' | 'column';
 
 // ============================================================================
 // Block 节点定义
@@ -31,7 +28,7 @@ export type StackDirection = 'row' | 'column';
 export const BaseNodeSchema = z.object({
   id: z.string(),
   type: z.enum([
-    'PageRoot', 'Split', 'Stack', 'Tabs', 'Tab',
+    'PageRoot', 'Tabs', 'Tab',
     'Grid', 'GridCell',
     'Table', 'Tree', 'Form', 'Card', 'Dialog', 'Drawer',
     'Chart', 'Custom'
@@ -39,23 +36,6 @@ export const BaseNodeSchema = z.object({
   label: z.string().optional(),
   componentOverride: z.string().optional(), // 局部 override 组件映射
   advanced: z.record(z.any()).optional(),   // 高级属性折叠
-});
-
-// Split 布局节点
-export const SplitNodeSchema = BaseNodeSchema.extend({
-  type: z.literal('Split'),
-  direction: z.enum(['horizontal', 'vertical']),
-  sizes: z.array(z.number()).optional(), // 百分比或像素
-  minSizes: z.array(z.number()).optional(),
-  children: z.array(z.lazy(() => LayoutNodeSchema)),
-});
-
-// Stack 布局节点
-export const StackNodeSchema = BaseNodeSchema.extend({
-  type: z.literal('Stack'),
-  direction: z.enum(['row', 'column']),
-  gap: z.number().optional(),
-  children: z.array(z.lazy(() => LayoutNodeSchema)),
 });
 
 // Tabs 容器
@@ -259,8 +239,6 @@ export const PageRootSchema = BaseNodeSchema.extend({
 // 联合布局节点类型
 export const LayoutNodeSchema: z.ZodType<any> = z.lazy(() =>
   z.discriminatedUnion('type', [
-    SplitNodeSchema,
-    StackNodeSchema,
     TabsNodeSchema,
     TabNodeSchema,
     GridNodeSchema,
@@ -425,8 +403,6 @@ export type Workspace = z.infer<typeof WorkspaceSchema>;
 // ============================================================================
 
 export type BaseNode = z.infer<typeof BaseNodeSchema>;
-export type SplitNode = z.infer<typeof SplitNodeSchema>;
-export type StackNode = z.infer<typeof StackNodeSchema>;
 export type TabsNode = z.infer<typeof TabsNodeSchema>;
 export type TabNode = z.infer<typeof TabNodeSchema>;
 export type GridNode = z.infer<typeof GridNodeSchema>;

@@ -7,10 +7,8 @@ import {
   Check,
   ChevronDown,
   ClipboardList,
-  Columns,
   CreditCard,
   GitBranch,
-  Layers,
   LayoutGrid,
   SquareStack,
   Table,
@@ -38,13 +36,21 @@ const templates: PageTemplate[] = [
     create: () => {
       const tree = createBlockNode('Tree', { label: '分类树' }) as LayoutNode;
       const table = createBlockNode('Table', { label: '数据表格' }) as LayoutNode;
-      const split = createBlockNode('Split', {
-        direction: 'horizontal',
-        sizes: [25, 75],
-        children: [tree, table],
+      const leftCell = createBlockNode('GridCell', {
+        label: '左侧区域',
+        children: [tree],
+      }) as LayoutNode;
+      const rightCell = createBlockNode('GridCell', {
+        label: '右侧区域',
+        children: [table],
+      }) as LayoutNode;
+      const grid = createBlockNode('Grid', {
+        columns: '1fr 3fr',
+        gap: 16,
+        children: [leftCell, rightCell],
         label: '左树右表',
       }) as LayoutNode;
-      return [split];
+      return [grid];
     },
   },
 ];
@@ -58,8 +64,6 @@ const containerBlocks = [
   { type: 'Grid', label: '栅格布局', icon: LayoutGrid, description: '多行多列Grid布局' },
   { type: 'Card', label: '卡片容器', icon: CreditCard, description: '带标题的卡片' },
   { type: 'Tabs', label: '标签页', icon: SquareStack, description: '多标签切换' },
-  { type: 'Stack', label: '堆叠布局', icon: Layers, description: '行/列堆叠' },
-  { type: 'Split', label: '分割布局', icon: Columns, description: '左右/上下分栏' },
 ];
 
 // 单元组件（叶子节点，不可嵌套）

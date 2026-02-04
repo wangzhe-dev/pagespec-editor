@@ -8,8 +8,6 @@ import {
   ChevronDown, 
   Plus, 
   FileText,
-  Columns,
-  Layers,
   SquareStack,
   Table,
   GitBranch,
@@ -27,7 +25,7 @@ const uiStore = useUIStore();
 
 // Icon mapping
 const iconMap: Record<string, any> = {
-  FileText, Columns, Layers, SquareStack, Table, GitBranch,
+  FileText, SquareStack, Table, GitBranch,
   ClipboardList, CreditCard, Square, PanelRight, BarChart3, Puzzle,
 };
 

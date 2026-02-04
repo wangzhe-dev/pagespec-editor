@@ -111,6 +111,7 @@ function onAddBlock(evt: any) {
   background: var(--bg-elevated);
   border-radius: 6px;
   padding: 6px;
+  min-height: 140px;
   cursor: pointer;
   transition: border-color 0.15s;
 }
@@ -154,7 +155,7 @@ function onAddBlock(evt: any) {
   flex-direction: column;
   gap: 4px;
   flex: 1;
-  min-height: 0;
+  min-height: 100px;
   overflow-y: auto;
 }
 
@@ -172,7 +173,7 @@ function onAddBlock(evt: any) {
 
 .drop-zone {
   flex: 1;
-  min-height: 100%;
+  min-height: 100px;
 }
 
 .drag-ghost {
