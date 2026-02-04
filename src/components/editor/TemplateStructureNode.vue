@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { usePagesStore, useUIStore } from '@/app/store';
+import { canAddChild, createBlockNode, getBlockMeta } from '@/domain/registry';
+import type { BlockType, CardNode, FormNode, GridNode, LayoutNode, TabsNode } from '@/domain/schema';
+import { Copy, GripVertical, Plus, Trash2 } from 'lucide-vue-next';
+import { computed, ref } from 'vue';
 import Draggable from 'vuedraggable';
-import { useUIStore } from '@/app/store';
-import { canAddChild, getBlockMeta } from '@/domain/registry';
-import type { LayoutNode, FormNode } from '@/domain/schema';
-import { GripVertical, Plus } from 'lucide-vue-next';
+import { CardContainer, GridContainer, TabsContainer } from './containers';
 
 const props = withDefaults(defineProps<{
   node: LayoutNode;
@@ -15,14 +16,26 @@ const props = withDefaults(defineProps<{
 });
 
 const uiStore = useUIStore();
+const pagesStore = usePagesStore();
 
 defineOptions({ name: 'TemplateStructureNode' });
+
+// 悬停状态
+const isHovered = ref(false);
 
 const isRoot = computed(() => props.node.type === 'PageRoot');
 const meta = computed(() => getBlockMeta(props.node.type));
 const isSelected = computed(() => uiStore.selectedNodeId === props.node.id);
 const allowChildren = computed(() => meta.value?.allowChildren ?? false);
 const isForm = computed(() => props.node.type === 'Form');
+
+// 特殊容器类型判断
+const isGrid = computed(() => props.node.type === 'Grid');
+const isGridCell = computed(() => props.node.type === 'GridCell');
+const isCard = computed(() => props.node.type === 'Card');
+const isTabs = computed(() => props.node.type === 'Tabs');
+const isTab = computed(() => props.node.type === 'Tab');
+const isSpecialContainer = computed(() => isGrid.value || isCard.value || isTabs.value || isGridCell.value || isTab.value);
 
 const childrenList = computed<LayoutNode[]>(() => {
   if (!allowChildren.value) return [];
@@ -42,7 +55,7 @@ const fieldList = computed(() => {
 function isDescendant(root: LayoutNode, targetId: string): boolean {
   if (root.id === targetId) return true;
   if ('children' in root && Array.isArray(root.children)) {
-    return root.children.some(child => isDescendant(child, targetId));
+    return root.children.some((child: LayoutNode) => isDescendant(child, targetId));
   }
   return false;
 }
@@ -63,7 +76,7 @@ function moveBlock(evt: any) {
 
   if (!allowChildren.value || !childType || !parentMeta) return false;
   if (props.node.type === 'Tabs' && childType !== 'Tab') return false;
-  if (!canAddChild(props.node.type, childType)) return false;
+  if (!canAddChild(props.node.type, childType as BlockType)) return false;
 
   if (dragged?.id && isDescendant(dragged as LayoutNode, props.node.id)) return false;
 
@@ -124,76 +137,177 @@ const summaryText = computed(() => {
   if (props.node.type === 'Stack') {
     return props.node.direction === 'row' ? '水平堆叠' : '垂直堆叠';
   }
+  if (props.node.type === 'Grid') {
+    const cols = (props.node as any).columns || 3;
+    const cells = (props.node as any).children?.length || 0;
+    return `${cols} 列 / ${cells} 单元格`;
+  }
+  if (props.node.type === 'Card') {
+    const children = (props.node as any).children?.length || 0;
+    return children > 0 ? `${children} 个子组件` : '空卡片';
+  }
   return meta.value?.description || '';
 });
+
+// 复制节点
+function duplicateNode() {
+  const page = pagesStore.activePage;
+  if (!page) return;
+
+  // 深拷贝节点
+  const cloned = JSON.parse(JSON.stringify(props.node));
+  // 重新生成 ID
+  function regenerateIds(node: any) {
+    node.id = createBlockNode(node.type).id;
+    if (node.children && Array.isArray(node.children)) {
+      node.children.forEach(regenerateIds);
+    }
+  }
+  regenerateIds(cloned);
+  cloned.label = (cloned.label || cloned.type) + ' 副本';
+
+  // 找到父节点并插入
+  pagesStore.insertAfterNode(page.id, props.node.id, cloned);
+  uiStore.selectNode(cloned.id);
+}
+
+// 删除节点
+function deleteNode() {
+  const page = pagesStore.activePage;
+  if (!page) return;
+  pagesStore.removeNode(page.id, props.node.id);
+  uiStore.selectNode(null);
+}
 </script>
 
 <template>
   <div class="structure-node" :class="{ selected: isSelected && showCard }">
-    <div
-      v-if="showCard"
-      class="node-card"
-      :class="{ root: isRoot }"
-      @click.stop="uiStore.selectNode(node.id)"
+    <!-- 特殊容器: Grid -->
+    <GridContainer
+      v-if="isGrid"
+      :node="(node as GridNode)"
+      :depth="depth"
     >
-      <div class="node-header">
-        <GripVertical v-if="!isRoot" :size="14" class="drag-handle" />
-        <div class="node-title">{{ node.label || meta?.label || node.type }}</div>
-        <div class="node-type">{{ node.type }}</div>
-      </div>
-      <div class="node-summary">{{ summaryText }}</div>
-    </div>
-
-    <Draggable
-      v-if="allowChildren"
-      :list="childrenList"
-      item-key="id"
-      :group="{ name: 'blocks', pull: true, put: true }"
-      :animation="150"
-      ghost-class="drag-ghost"
-      handle=".drag-handle"
-      :move="moveBlock"
-      @add="onAddBlock"
-      class="node-children"
-      :class="[layoutClass, { canvas: !showCard }]"
-    >
-      <template #item="{ element }">
+      <template #child="{ child, depth: childDepth }">
         <TemplateStructureNode
-          :node="element"
-          :depth="depth + 1"
+          :node="child"
+          :depth="childDepth"
         />
       </template>
-      <template #footer>
-        <div class="drop-slot">
-          <Plus :size="12" />
-          <span>拖拽组件到此处</span>
-        </div>
-      </template>
-    </Draggable>
+    </GridContainer>
 
-    <Draggable
-      v-else-if="isForm"
-      :list="fieldList"
-      item-key="key"
-      :group="{ name: 'fields', pull: true, put: true }"
-      :animation="150"
-      ghost-class="drag-ghost"
-      @add="onAddField"
-      class="form-fields"
+    <!-- 特殊容器: Card -->
+    <CardContainer
+      v-else-if="isCard"
+      :node="(node as CardNode)"
+      :depth="depth"
     >
-      <template #item="{ element }">
-        <div class="form-field-chip">
-          <span>{{ element.label }}</span>
-          <em>{{ element.type }}</em>
-        </div>
+      <template #child="{ child, depth: childDepth }">
+        <TemplateStructureNode
+          :node="child"
+          :depth="childDepth"
+        />
       </template>
-      <template #footer>
-        <div class="drop-slot">
-          <Plus :size="12" />
-          <span>拖拽字段到此处</span>
-        </div>
+    </CardContainer>
+
+    <!-- 特殊容器: Tabs -->
+    <TabsContainer
+      v-else-if="isTabs"
+      :node="(node as TabsNode)"
+      :depth="depth"
+    >
+      <template #child="{ child, depth: childDepth }">
+        <TemplateStructureNode
+          :node="child"
+          :depth="childDepth"
+        />
       </template>
-    </Draggable>
+    </TabsContainer>
+
+    <!-- GridCell 和 Tab 由父组件专门处理，这里不渲染 -->
+    <template v-else-if="isGridCell || isTab">
+      <!-- 由 GridContainer/TabsContainer 内部渲染 -->
+    </template>
+
+    <!-- 通用节点卡片 -->
+    <template v-else>
+      <div
+        v-if="showCard"
+        class="node-card"
+        :class="{ root: isRoot, hovered: isHovered }"
+        @click.stop="uiStore.selectNode(node.id)"
+        @mouseenter="isHovered = true"
+        @mouseleave="isHovered = false"
+      >
+        <div class="node-header">
+          <GripVertical v-if="!isRoot" :size="14" class="drag-handle" />
+          <div class="node-title">{{ node.label || meta?.label || node.type }}</div>
+          <div class="node-type">{{ node.type }}</div>
+
+          <!-- 悬停操作按钮 -->
+          <div v-if="isHovered && !isRoot" class="node-actions">
+            <button class="action-btn" @click.stop="duplicateNode" title="复制">
+              <Copy :size="12" />
+            </button>
+            <button class="action-btn delete-btn" @click.stop="deleteNode" title="删除">
+              <Trash2 :size="12" />
+            </button>
+          </div>
+        </div>
+        <div class="node-summary">{{ summaryText }}</div>
+      </div>
+
+      <Draggable
+        v-if="allowChildren && !isSpecialContainer"
+        :list="childrenList"
+        item-key="id"
+        :group="{ name: 'blocks', pull: true, put: true }"
+        :animation="150"
+        ghost-class="drag-ghost"
+        handle=".drag-handle"
+        :move="moveBlock"
+        @add="onAddBlock"
+        class="node-children"
+        :class="[layoutClass, { canvas: !showCard }]"
+      >
+        <template #item="{ element }">
+          <TemplateStructureNode
+            :node="element"
+            :depth="depth + 1"
+          />
+        </template>
+        <template #footer>
+          <div class="drop-slot">
+            <Plus :size="12" />
+            <span>拖拽组件到此处</span>
+          </div>
+        </template>
+      </Draggable>
+
+      <Draggable
+        v-else-if="isForm"
+        :list="fieldList"
+        item-key="key"
+        :group="{ name: 'fields', pull: true, put: true }"
+        :animation="150"
+        ghost-class="drag-ghost"
+        @add="onAddField"
+        class="form-fields"
+      >
+        <template #item="{ element }">
+          <div class="form-field-chip">
+            <span>{{ element.label }}</span>
+            <em>{{ element.type }}</em>
+          </div>
+        </template>
+        <template #footer>
+          <div class="drop-slot">
+            <Plus :size="12" />
+            <span>拖拽字段到此处</span>
+          </div>
+        </template>
+      </Draggable>
+    </template>
   </div>
 </template>
 
@@ -318,5 +432,42 @@ const summaryText = computed(() => {
 
 .drag-ghost {
   opacity: 0.6;
+}
+
+/* 悬停操作按钮 */
+.node-actions {
+  display: flex;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-elevated);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.action-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+  border-color: var(--border-strong);
+}
+
+.action-btn.delete-btn:hover {
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+  border-color: #ef4444;
+}
+
+.node-card.hovered {
+  border-color: var(--border-strong);
 }
 </style>

@@ -3,17 +3,17 @@
  * 页面数据管理
  */
 
-import { defineStore } from 'pinia';
-import { ref, computed } from 'vue';
-import { nanoid } from 'nanoid';
-import type { PageSpec, LayoutNode, Recipe } from '@/domain/schema';
 import { createBlockNode } from '@/domain/registry';
+import type { LayoutNode, PageSpec, Recipe } from '@/domain/schema';
+import { nanoid } from 'nanoid';
+import { defineStore } from 'pinia';
+import { computed, ref } from 'vue';
 
 export const usePagesStore = defineStore('pages', () => {
   // ============================================================================
   // State
   // ============================================================================
-  
+
   const pages = ref<PageSpec[]>([]);
   const activePageId = ref<string | null>(null);
 
@@ -49,7 +49,7 @@ export const usePagesStore = defineStore('pages', () => {
       createdAt: now,
       updatedAt: now,
     };
-    
+
     pages.value.push(page);
     activePageId.value = page.id;
     return page;
@@ -105,7 +105,7 @@ export const usePagesStore = defineStore('pages', () => {
 
   function findNode(root: LayoutNode, nodeId: string): LayoutNode | null {
     if (root.id === nodeId) return root;
-    
+
     if ('children' in root && Array.isArray(root.children)) {
       for (const child of root.children) {
         const found = findNode(child, nodeId);
@@ -141,7 +141,7 @@ export const usePagesStore = defineStore('pages', () => {
     if (!parent || !('children' in parent)) return null;
 
     const newNode = createBlockNode(nodeType);
-    
+
     if (index !== undefined && index >= 0) {
       parent.children.splice(index, 0, newNode);
     } else {
@@ -174,6 +174,20 @@ export const usePagesStore = defineStore('pages', () => {
     }
   }
 
+  // 别名，方便使用
+  const removeNode = deleteNode;
+
+  function insertAfterNode(pageId: string, targetNodeId: string, newNode: LayoutNode): void {
+    const page = pages.value.find(p => p.id === pageId);
+    if (!page) return;
+
+    const result = findParent(page.root as unknown as LayoutNode, targetNodeId);
+    if (result) {
+      result.parent.children.splice(result.index + 1, 0, newNode);
+      page.updatedAt = Date.now();
+    }
+  }
+
   function moveNode(
     pageId: string,
     nodeId: string,
@@ -186,7 +200,7 @@ export const usePagesStore = defineStore('pages', () => {
     // 找到并移除节点
     const result = findParent(page.root as unknown as LayoutNode, nodeId);
     if (!result) return;
-    
+
     const [node] = result.parent.children.splice(result.index, 1);
 
     // 添加到新位置
@@ -269,12 +283,14 @@ export const usePagesStore = defineStore('pages', () => {
 
   function loadFromStorage(): void {
     try {
-      const stored = localStorage.getItem('pagespec-pages');
+      const stored = localStorage.getItem('pagespec-pages-v2');
       if (stored) {
         const data = JSON.parse(stored);
         pages.value = data.pages || [];
         activePageId.value = data.activePageId || null;
       }
+      // 清理旧版本数据
+      localStorage.removeItem('pagespec-pages');
     } catch (e) {
       console.error('Failed to load pages from storage:', e);
     }
@@ -282,7 +298,7 @@ export const usePagesStore = defineStore('pages', () => {
 
   function saveToStorage(): void {
     try {
-      localStorage.setItem('pagespec-pages', JSON.stringify({
+      localStorage.setItem('pagespec-pages-v2', JSON.stringify({
         pages: pages.value,
         activePageId: activePageId.value,
       }));
@@ -308,6 +324,8 @@ export const usePagesStore = defineStore('pages', () => {
     addNode,
     updateNode,
     deleteNode,
+    removeNode,
+    insertAfterNode,
     moveNode,
     addRecipe,
     updateRecipe,

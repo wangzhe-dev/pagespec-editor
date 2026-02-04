@@ -4,8 +4,8 @@
  * 新增 Block 只需在此注册，无需修改 Editor UI
  */
 
-import type { BlockType, LayoutNode } from '../schema';
 import { nanoid } from 'nanoid';
+import type { BlockType, LayoutNode } from '../schema';
 
 // ============================================================================
 // Block 元数据类型
@@ -85,9 +85,9 @@ blockRegistry.set('Split', {
     children: [],
   },
   propertySchema: [
-    { 
-      key: 'direction', 
-      label: '分割方向', 
+    {
+      key: 'direction',
+      label: '分割方向',
       type: 'select',
       options: [
         { label: '水平 (左右)', value: 'horizontal' },
@@ -95,9 +95,9 @@ blockRegistry.set('Split', {
       ],
       defaultValue: 'horizontal',
     },
-    { 
-      key: 'sizes', 
-      label: '尺寸比例', 
+    {
+      key: 'sizes',
+      label: '尺寸比例',
       type: 'text',
       placeholder: '30,70',
       description: '用逗号分隔的百分比或像素值',
@@ -123,9 +123,9 @@ blockRegistry.set('Stack', {
     children: [],
   },
   propertySchema: [
-    { 
-      key: 'direction', 
-      label: '堆叠方向', 
+    {
+      key: 'direction',
+      label: '堆叠方向',
       type: 'select',
       options: [
         { label: '水平 (行)', value: 'row' },
@@ -134,6 +134,132 @@ blockRegistry.set('Stack', {
       defaultValue: 'column',
     },
     { key: 'gap', label: '间距 (px)', type: 'number', defaultValue: 16, min: 0, max: 100 },
+  ],
+});
+
+// Grid - 栅格容器
+blockRegistry.set('Grid', {
+  type: 'Grid',
+  label: '栅格布局',
+  icon: 'LayoutGrid',
+  category: 'layout',
+  description: 'CSS Grid 栅格容器，灵活的多行多列布局',
+  allowChildren: true,
+  defaultProps: {
+    type: 'Grid',
+    columns: 2,
+    gap: 12,
+    justifyItems: 'stretch',
+    alignItems: 'stretch',
+    // 默认包含两个 Cell，用户可通过复制按钮增加更多
+    children: [
+      { id: '__cell1__', type: 'GridCell', label: '左侧区域', children: [] },
+      { id: '__cell2__', type: 'GridCell', label: '右侧区域', children: [] },
+    ],
+  },
+  propertySchema: [
+    {
+      key: 'columns',
+      label: '列数/模板',
+      type: 'text',
+      placeholder: '3 或 1fr 2fr 1fr',
+      description: '数字表示等宽列，字符串支持完整 grid-template-columns',
+      defaultValue: '3',
+    },
+    {
+      key: 'rows',
+      label: '行数/模板',
+      type: 'text',
+      placeholder: 'auto 或 repeat(2, 1fr)',
+      description: '可选，字符串支持完整 grid-template-rows',
+    },
+    {
+      key: 'gap',
+      label: '间距 (px)',
+      type: 'number',
+      defaultValue: 12,
+      min: 0,
+      max: 100,
+    },
+  ],
+  advancedSchema: [
+    {
+      key: 'justifyItems',
+      label: '水平对齐',
+      type: 'select',
+      options: [
+        { label: '起始', value: 'start' },
+        { label: '居中', value: 'center' },
+        { label: '末尾', value: 'end' },
+        { label: '拉伸', value: 'stretch' },
+      ],
+      defaultValue: 'stretch',
+    },
+    {
+      key: 'alignItems',
+      label: '垂直对齐',
+      type: 'select',
+      options: [
+        { label: '起始', value: 'start' },
+        { label: '居中', value: 'center' },
+        { label: '末尾', value: 'end' },
+        { label: '拉伸', value: 'stretch' },
+      ],
+      defaultValue: 'stretch',
+    },
+    { key: 'minCellHeight', label: '最小单元格高度', type: 'number', placeholder: '80' },
+  ],
+});
+
+// GridCell - 栅格单元格
+blockRegistry.set('GridCell', {
+  type: 'GridCell',
+  label: '单元格',
+  icon: 'Square',
+  category: 'layout',
+  description: '栅格单元格，可跨行跨列',
+  allowChildren: true,
+  allowedParents: ['Grid'],
+  defaultProps: {
+    type: 'GridCell',
+    colStart: 1,
+    colSpan: 1,
+    rowStart: 1,
+    rowSpan: 1,
+    children: [],
+  },
+  propertySchema: [
+    { key: 'colSpan', label: '跨列数', type: 'number', defaultValue: 1, min: 1, max: 12 },
+    { key: 'rowSpan', label: '跨行数', type: 'number', defaultValue: 1, min: 1, max: 12 },
+  ],
+  advancedSchema: [
+    { key: 'colStart', label: '起始列', type: 'number', defaultValue: 1, min: 1 },
+    { key: 'rowStart', label: '起始行', type: 'number', defaultValue: 1, min: 1 },
+    {
+      key: 'justifySelf',
+      label: '水平对齐',
+      type: 'select',
+      options: [
+        { label: '继承', value: '' },
+        { label: '起始', value: 'start' },
+        { label: '居中', value: 'center' },
+        { label: '末尾', value: 'end' },
+        { label: '拉伸', value: 'stretch' },
+      ],
+    },
+    {
+      key: 'alignSelf',
+      label: '垂直对齐',
+      type: 'select',
+      options: [
+        { label: '继承', value: '' },
+        { label: '起始', value: 'start' },
+        { label: '居中', value: 'center' },
+        { label: '末尾', value: 'end' },
+        { label: '拉伸', value: 'stretch' },
+      ],
+    },
+    { key: 'padding', label: '内边距', type: 'number', min: 0 },
   ],
 });
 
@@ -198,17 +324,17 @@ blockRegistry.set('Table', {
     mockCount: 5,
   },
   propertySchema: [
-    { 
-      key: 'columns', 
-      label: '列配置', 
+    {
+      key: 'columns',
+      label: '列配置',
       type: 'array',
       arrayItemSchema: [
         { key: 'key', label: '字段名', type: 'text', required: true },
         { key: 'title', label: '列标题', type: 'text', required: true },
         { key: 'width', label: '宽度', type: 'text' },
-        { 
-          key: 'fixed', 
-          label: '固定', 
+        {
+          key: 'fixed',
+          label: '固定',
           type: 'select',
           options: [
             { label: '不固定', value: '' },
@@ -219,9 +345,9 @@ blockRegistry.set('Table', {
         { key: 'sortable', label: '可排序', type: 'boolean' },
       ],
     },
-    { 
-      key: 'selection', 
-      label: '选择模式', 
+    {
+      key: 'selection',
+      label: '选择模式',
       type: 'select',
       options: [
         { label: '无', value: 'none' },
@@ -235,9 +361,9 @@ blockRegistry.set('Table', {
     { key: 'rowKey', label: '行 Key', type: 'text', defaultValue: 'id' },
     { key: 'apiPath', label: 'API 路径', type: 'text', placeholder: '/api/xxx/list' },
     { key: 'mockCount', label: 'Mock 数量', type: 'number', defaultValue: 5 },
-    { 
-      key: 'toolbar', 
-      label: '工具栏', 
+    {
+      key: 'toolbar',
+      label: '工具栏',
       type: 'array',
       description: '选择工具栏按钮',
     },
@@ -248,9 +374,9 @@ blockRegistry.set('Table', {
       arrayItemSchema: [
         { key: 'key', label: '字段', type: 'text', required: true },
         { key: 'label', label: '标签', type: 'text', required: true },
-        { 
-          key: 'type', 
-          label: '类型', 
+        {
+          key: 'type',
+          label: '类型',
           type: 'select',
           options: [
             { label: '输入框', value: 'input' },
@@ -534,19 +660,39 @@ export function registerBlock(meta: BlockMeta): void {
 
 /**
  * 创建 Block 节点
+ * 自动为节点和子节点生成唯一 ID
  */
 export function createBlockNode(type: BlockType, overrides: Partial<LayoutNode> = {}): LayoutNode {
   const meta = getBlockMeta(type);
   if (!meta) {
     throw new Error(`Unknown block type: ${type}`);
   }
-  
-  return {
+
+  // 深拷贝 defaultProps 并生成唯一 ID
+  const node = JSON.parse(JSON.stringify({
     ...meta.defaultProps,
-    id: nanoid(8),
     label: meta.label,
     ...overrides,
-  } as LayoutNode;
+  }));
+
+  // 为节点生成唯一 ID
+  node.id = nanoid(8);
+
+  // 递归为子节点生成唯一 ID
+  function regenerateIds(n: any) {
+    if (n.id) {
+      n.id = nanoid(8);
+    }
+    if (Array.isArray(n.children)) {
+      n.children.forEach(regenerateIds);
+    }
+  }
+
+  if (Array.isArray(node.children)) {
+    node.children.forEach(regenerateIds);
+  }
+
+  return node as LayoutNode;
 }
 
 /**
@@ -555,15 +701,12 @@ export function createBlockNode(type: BlockType, overrides: Partial<LayoutNode> 
 export function canAddChild(parentType: BlockType, childType: BlockType): boolean {
   const parentMeta = getBlockMeta(parentType);
   const childMeta = getBlockMeta(childType);
-  
+
   if (!parentMeta || !childMeta) return false;
   if (!parentMeta.allowChildren) return false;
   if (childMeta.allowedParents && !childMeta.allowedParents.includes(parentType)) {
     return false;
   }
-  
+
   return true;
 }
-
-// 导出类型
-export type { BlockMeta, PropertyField };

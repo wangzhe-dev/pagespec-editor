@@ -14,8 +14,9 @@ export const SCHEMA_VERSION = 1;
 
 // 唯一标识符
 export type NodeId = string;
-export type BlockType = 
+export type BlockType =
   | 'PageRoot' | 'Split' | 'Stack' | 'Tabs' | 'Tab'
+  | 'Grid' | 'GridCell'  // Grid 栅格布局
   | 'Table' | 'Tree' | 'Form' | 'Card' | 'Dialog' | 'Drawer'
   | 'Chart' | 'Custom';
 
@@ -31,6 +32,7 @@ export const BaseNodeSchema = z.object({
   id: z.string(),
   type: z.enum([
     'PageRoot', 'Split', 'Stack', 'Tabs', 'Tab',
+    'Grid', 'GridCell',
     'Table', 'Tree', 'Form', 'Card', 'Dialog', 'Drawer',
     'Chart', 'Custom'
   ]),
@@ -72,6 +74,54 @@ export const TabNodeSchema = BaseNodeSchema.extend({
   icon: z.string().optional(),
   closable: z.boolean().optional(),
   children: z.array(z.lazy(() => LayoutNodeSchema)).optional(),
+});
+
+// ============================================================================
+// Grid 栅格布局
+// ============================================================================
+
+// GridCell 单元格
+export const GridCellSchema = BaseNodeSchema.extend({
+  type: z.literal('GridCell'),
+  // Flex 布局
+  flex: z.number().optional(),           // flex 比例，如 2 表示 flex: 2
+  // 位置与尺寸（基于 CSS Grid）
+  colStart: z.number().default(1),      // grid-column-start
+  colSpan: z.number().default(1),       // 占几列
+  rowStart: z.number().default(1),      // grid-row-start
+  rowSpan: z.number().default(1),       // 占几行
+  // 对齐
+  justifySelf: z.enum(['start', 'center', 'end', 'stretch']).optional(),
+  alignSelf: z.enum(['start', 'center', 'end', 'stretch']).optional(),
+  // 内边距
+  padding: z.number().optional(),
+  children: z.array(z.lazy(() => LayoutNodeSchema)).optional(),
+});
+
+// Grid 容器
+export const GridNodeSchema = BaseNodeSchema.extend({
+  type: z.literal('Grid'),
+  // 列配置
+  columns: z.union([
+    z.number(),                         // 固定列数，如 3
+    z.string(),                         // 自定义模板，如 "1fr 2fr 1fr" 或 "repeat(4, 1fr)"
+  ]).default(3),
+  // 行配置
+  rows: z.union([
+    z.number(),                         // 固定行数
+    z.string(),                         // 自定义模板，如 "auto 1fr auto"
+  ]).optional(),
+  // 间距
+  gap: z.union([
+    z.number(),                         // 统一间距
+    z.object({ row: z.number(), col: z.number() }), // 行列分别
+  ]).default(12),
+  // 对齐
+  justifyItems: z.enum(['start', 'center', 'end', 'stretch']).default('stretch'),
+  alignItems: z.enum(['start', 'center', 'end', 'stretch']).default('stretch'),
+  // 最小单元格高度
+  minCellHeight: z.number().optional(),
+  children: z.array(z.lazy(() => GridCellSchema)).default([]),
 });
 
 // ============================================================================
@@ -213,6 +263,8 @@ export const LayoutNodeSchema: z.ZodType<any> = z.lazy(() =>
     StackNodeSchema,
     TabsNodeSchema,
     TabNodeSchema,
+    GridNodeSchema,
+    GridCellSchema,
     TableNodeSchema,
     TreeNodeSchema,
     FormNodeSchema,
@@ -377,6 +429,8 @@ export type SplitNode = z.infer<typeof SplitNodeSchema>;
 export type StackNode = z.infer<typeof StackNodeSchema>;
 export type TabsNode = z.infer<typeof TabsNodeSchema>;
 export type TabNode = z.infer<typeof TabNodeSchema>;
+export type GridNode = z.infer<typeof GridNodeSchema>;
+export type GridCell = z.infer<typeof GridCellSchema>;
 export type TableNode = z.infer<typeof TableNodeSchema>;
 export type TreeNode = z.infer<typeof TreeNodeSchema>;
 export type FormNode = z.infer<typeof FormNodeSchema>;

@@ -3,9 +3,9 @@
  * 界面状态管理
  */
 
-import { defineStore } from 'pinia';
-import { ref, computed } from 'vue';
 import type { PromptStyle } from '@/domain/compiler';
+import { defineStore } from 'pinia';
+import { computed, ref } from 'vue';
 
 export type PanelType = 'pages' | 'tree' | 'properties' | 'preview' | 'profile';
 
@@ -16,6 +16,9 @@ export const useUIStore = defineStore('ui', () => {
 
   // 选中的节点
   const selectedNodeId = ref<string | null>(null);
+
+  // 悬停的节点（用于控制操作按钮显示）
+  const hoveredNodeId = ref<string | null>(null);
 
   // 面板可见性
   const panelVisibility = ref<Record<PanelType, boolean>>({
@@ -75,6 +78,10 @@ export const useUIStore = defineStore('ui', () => {
     selectedNodeId.value = nodeId;
   }
 
+  function hoverNode(nodeId: string | null): void {
+    hoveredNodeId.value = nodeId;
+  }
+
   function togglePanel(panel: PanelType): void {
     panelVisibility.value[panel] = !panelVisibility.value[panel];
   }
@@ -116,7 +123,7 @@ export const useUIStore = defineStore('ui', () => {
   ): void {
     const id = Math.random().toString(36).substr(2, 9);
     toasts.value.push({ id, type, message, duration });
-    
+
     if (duration > 0) {
       setTimeout(() => {
         removeToast(id);
@@ -171,6 +178,7 @@ export const useUIStore = defineStore('ui', () => {
   return {
     // State
     selectedNodeId,
+    hoveredNodeId,
     panelVisibility,
     panelSizes,
     promptStyle,
@@ -182,6 +190,7 @@ export const useUIStore = defineStore('ui', () => {
     isPanelVisible,
     // Actions
     selectNode,
+    hoverNode,
     togglePanel,
     setPanelVisibility,
     setPanelSize,

@@ -1,10 +1,15 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
+/**
+ * PropertyInspector - 属性检查器
+ * 显示和编辑选中节点的属性
+ */
 import { usePagesStore, useUIStore } from '@/app/store';
-import { getBlockMeta, type PropertyField } from '@/domain/registry';
+import { getBlockMeta } from '@/domain/registry';
 import type { LayoutNode } from '@/domain/schema';
-import { Settings2, Plus, Trash2, ChevronDown, ChevronRight } from 'lucide-vue-next';
 import { debounce } from '@/utils';
+import { ChevronDown, ChevronRight, Settings2 } from 'lucide-vue-next';
+import { computed, ref, watch } from 'vue';
+import { PropertyField, PropertySection } from './property';
 
 const pagesStore = usePagesStore();
 const uiStore = useUIStore();
@@ -13,7 +18,7 @@ const activePage = computed(() => pagesStore.activePage);
 const selectedNodeId = computed(() => uiStore.selectedNodeId);
 const propertyMode = computed(() => uiStore.propertyMode);
 
-// Find selected node
+// 查找选中节点
 const selectedNode = computed<LayoutNode | null>(() => {
   if (!activePage.value || !selectedNodeId.value) return null;
   return findNode(activePage.value.root as unknown as LayoutNode, selectedNodeId.value);
@@ -29,10 +34,10 @@ const advancedSchema = computed(() => blockMeta.value?.advancedSchema || []);
 
 const showAdvanced = ref(false);
 
-// Local form state
+// 本地表单状态
 const formData = ref<Record<string, any>>({});
 
-// Sync form data with selected node
+// 同步表单数据与选中节点
 watch(selectedNode, (node) => {
   if (node) {
     formData.value = { ...node };
@@ -41,7 +46,7 @@ watch(selectedNode, (node) => {
   }
 }, { immediate: true, deep: true });
 
-// Debounced update
+// 防抖更新
 const debouncedUpdate = debounce((key: string, value: any) => {
   if (!activePage.value || !selectedNodeId.value) return;
   pagesStore.updateNode(activePage.value.id, selectedNodeId.value, { [key]: value });
@@ -62,29 +67,6 @@ function findNode(root: LayoutNode, nodeId: string): LayoutNode | null {
   }
   return null;
 }
-
-// Array field helpers
-function addArrayItem(key: string, schema: PropertyField[]) {
-  if (!formData.value[key]) {
-    formData.value[key] = [];
-  }
-  const newItem: Record<string, any> = {};
-  for (const field of schema) {
-    newItem[field.key] = field.defaultValue ?? '';
-  }
-  formData.value[key].push(newItem);
-  debouncedUpdate(key, formData.value[key]);
-}
-
-function removeArrayItem(key: string, index: number) {
-  formData.value[key].splice(index, 1);
-  debouncedUpdate(key, formData.value[key]);
-}
-
-function updateArrayItem(key: string, index: number, field: string, value: any) {
-  formData.value[key][index][field] = value;
-  debouncedUpdate(key, formData.value[key]);
-}
 </script>
 
 <template>
@@ -92,13 +74,13 @@ function updateArrayItem(key: string, index: number, field: string, value: any) 
     <div class="panel-header">
       <span class="panel-title">属性</span>
       <div class="mode-switch">
-        <button 
+        <button
           :class="{ active: propertyMode === 'basic' }"
           @click="uiStore.setPropertyMode('basic')"
         >
           基础
         </button>
-        <button 
+        <button
           :class="{ active: propertyMode === 'advanced' }"
           @click="uiStore.setPropertyMode('advanced')"
         >
@@ -106,17 +88,17 @@ function updateArrayItem(key: string, index: number, field: string, value: any) 
         </button>
       </div>
     </div>
-    
+
     <div v-if="!selectedNode" class="empty-state">
       <Settings2 :size="32" class="empty-icon" />
       <p>选择一个节点查看属性</p>
     </div>
-    
+
     <div v-else class="property-form">
-      <!-- Node info header -->
+      <!-- 节点信息 -->
       <div class="node-info">
         <div class="node-type-badge">{{ selectedNode.type }}</div>
-        <input 
+        <input
           type="text"
           class="node-label-input"
           :value="formData.label || ''"
@@ -124,168 +106,40 @@ function updateArrayItem(key: string, index: number, field: string, value: any) 
           placeholder="节点标签（可选）"
         />
       </div>
-      
-      <!-- Basic properties -->
-      <div class="property-section">
-        <div class="section-title">基础属性</div>
-        
-        <template v-for="field in propertySchema" :key="field.key">
-          <!-- Text input -->
-          <div v-if="field.type === 'text'" class="form-field">
-            <label>{{ field.label }}</label>
-            <input 
-              type="text"
-              :value="formData[field.key] ?? field.defaultValue ?? ''"
-              @input="updateField(field.key, ($event.target as HTMLInputElement).value)"
-              :placeholder="field.placeholder"
-            />
-            <span v-if="field.description" class="field-hint">{{ field.description }}</span>
-          </div>
-          
-          <!-- Number input -->
-          <div v-else-if="field.type === 'number'" class="form-field">
-            <label>{{ field.label }}</label>
-            <input 
-              type="number"
-              :value="formData[field.key] ?? field.defaultValue ?? 0"
-              @input="updateField(field.key, Number(($event.target as HTMLInputElement).value))"
-              :min="field.min"
-              :max="field.max"
-            />
-          </div>
-          
-          <!-- Select -->
-          <div v-else-if="field.type === 'select'" class="form-field">
-            <label>{{ field.label }}</label>
-            <select 
-              :value="formData[field.key] ?? field.defaultValue ?? ''"
-              @change="updateField(field.key, ($event.target as HTMLSelectElement).value)"
-            >
-              <option v-for="opt in field.options" :key="opt.value" :value="opt.value">
-                {{ opt.label }}
-              </option>
-            </select>
-          </div>
-          
-          <!-- Boolean -->
-          <div v-else-if="field.type === 'boolean'" class="form-field inline">
-            <label>
-              <input 
-                type="checkbox"
-                :checked="formData[field.key] ?? field.defaultValue ?? false"
-                @change="updateField(field.key, ($event.target as HTMLInputElement).checked)"
-              />
-              {{ field.label }}
-            </label>
-          </div>
-          
-          <!-- Array -->
-          <div v-else-if="field.type === 'array' && field.arrayItemSchema" class="form-field array-field">
-            <div class="array-header">
-              <label>{{ field.label }}</label>
-              <button class="add-item-btn" @click="addArrayItem(field.key, field.arrayItemSchema!)">
-                <Plus :size="12" />
-                添加
-              </button>
-            </div>
-            
-            <div 
-              v-for="(item, index) in (formData[field.key] || [])" 
-              :key="index"
-              class="array-item"
-            >
-              <div class="array-item-header">
-                <span class="item-index">#{{ index + 1 }}</span>
-                <button class="remove-item-btn" @click="removeArrayItem(field.key, index)">
-                  <Trash2 :size="12" />
-                </button>
-              </div>
-              <div class="array-item-fields">
-                <template v-for="subField in field.arrayItemSchema" :key="subField.key">
-                  <div class="sub-field">
-                    <label>{{ subField.label }}</label>
-                    <input 
-                      v-if="subField.type === 'text'"
-                      type="text"
-                      :value="item[subField.key] ?? ''"
-                      @input="updateArrayItem(field.key, index, subField.key, ($event.target as HTMLInputElement).value)"
-                    />
-                    <select 
-                      v-else-if="subField.type === 'select'"
-                      :value="item[subField.key] ?? ''"
-                      @change="updateArrayItem(field.key, index, subField.key, ($event.target as HTMLSelectElement).value)"
-                    >
-                      <option v-for="opt in subField.options" :key="opt.value" :value="opt.value">
-                        {{ opt.label }}
-                      </option>
-                    </select>
-                    <label v-else-if="subField.type === 'boolean'" class="checkbox-label">
-                      <input 
-                        type="checkbox"
-                        :checked="item[subField.key] ?? false"
-                        @change="updateArrayItem(field.key, index, subField.key, ($event.target as HTMLInputElement).checked)"
-                      />
-                      {{ subField.label }}
-                    </label>
-                  </div>
-                </template>
-              </div>
-            </div>
-            
-            <div v-if="!formData[field.key]?.length" class="empty-array">
-              暂无数据，点击上方按钮添加
-            </div>
-          </div>
-        </template>
-      </div>
-      
-      <!-- Advanced properties -->
+
+      <!-- 基础属性 -->
+      <PropertySection
+        title="基础属性"
+        :fields="propertySchema"
+        :form-data="formData"
+        @update="updateField"
+      />
+
+      <!-- 高级属性 -->
       <div v-if="advancedSchema.length > 0 && propertyMode === 'advanced'" class="property-section">
         <button class="section-toggle" @click="showAdvanced = !showAdvanced">
           <ChevronDown v-if="showAdvanced" :size="14" />
           <ChevronRight v-else :size="14" />
           <span>高级属性</span>
         </button>
-        
+
         <div v-if="showAdvanced" class="advanced-fields">
-          <template v-for="field in advancedSchema" :key="field.key">
-            <div v-if="field.type === 'text'" class="form-field">
-              <label>{{ field.label }}</label>
-              <input 
-                type="text"
-                :value="formData[field.key] ?? field.defaultValue ?? ''"
-                @input="updateField(field.key, ($event.target as HTMLInputElement).value)"
-                :placeholder="field.placeholder"
-              />
-            </div>
-            <div v-else-if="field.type === 'number'" class="form-field">
-              <label>{{ field.label }}</label>
-              <input 
-                type="number"
-                :value="formData[field.key] ?? field.defaultValue ?? 0"
-                @input="updateField(field.key, Number(($event.target as HTMLInputElement).value))"
-              />
-            </div>
-            <div v-else-if="field.type === 'boolean'" class="form-field inline">
-              <label>
-                <input 
-                  type="checkbox"
-                  :checked="formData[field.key] ?? field.defaultValue ?? false"
-                  @change="updateField(field.key, ($event.target as HTMLInputElement).checked)"
-                />
-                {{ field.label }}
-              </label>
-            </div>
-          </template>
+          <PropertyField
+            v-for="field in advancedSchema"
+            :key="field.key"
+            :field="field"
+            :value="formData[field.key]"
+            @update="updateField(field.key, $event)"
+          />
         </div>
       </div>
-      
-      <!-- Component override -->
+
+      <!-- 组件覆盖 -->
       <div v-if="propertyMode === 'advanced'" class="property-section">
         <div class="section-title">组件覆盖</div>
         <div class="form-field">
           <label>使用组件</label>
-          <input 
+          <input
             type="text"
             :value="formData.componentOverride ?? ''"
             @input="updateField('componentOverride', ($event.target as HTMLInputElement).value)"

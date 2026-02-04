@@ -1,65 +1,47 @@
 <script setup lang="ts">
-import { computed, watch } from 'vue';
 import { usePagesStore } from '@/app/store';
 import { createBlockNode } from '@/domain/registry';
-import type { LayoutNode, StackDirection } from '@/domain/schema';
+import type { LayoutNode } from '@/domain/schema';
+import { computed, watch } from 'vue';
 import TemplateStructureNode from './TemplateStructureNode.vue';
 
 const pagesStore = usePagesStore();
 
 const activePage = computed(() => pagesStore.activePage);
 
+// 获取根容器（第一个子节点）
 const rootContainer = computed(() => {
   const page = activePage.value;
   if (!page) return null;
   const root = page.root as LayoutNode;
-  if (root.children?.length === 1 && root.children[0].type === 'Stack') {
+  if (root.children?.length > 0) {
     return root.children[0] as LayoutNode;
   }
   return null;
 });
 
-const layoutDirection = computed<StackDirection>(() => {
-  const container = rootContainer.value as any;
-  if (container && container.direction) return container.direction;
-  return 'column';
-});
-
-function ensureRootContainer(direction?: StackDirection) {
+// 确保有默认的根容器结构
+function ensureDefaultStructure() {
   const page = activePage.value;
-  if (!page) return null;
+  if (!page) return;
   const root = page.root as LayoutNode;
 
-  if (root.children?.length === 1 && root.children[0].type === 'Stack') {
-    const existing = root.children[0] as LayoutNode;
-    if (direction && (existing as any).direction !== direction) {
-      pagesStore.updateNode(page.id, existing.id, { direction });
-    }
-    return existing;
-  }
+  // 如果已有子节点，不重复创建
+  if (root.children?.length > 0) return;
 
-  const oldChildren = Array.isArray(root.children) ? root.children : [];
-  const stack = createBlockNode('Stack', {
-    direction: direction ?? 'column',
-    gap: 12,
-    children: oldChildren,
-    label: '布局容器',
+  // 创建默认结构: Grid -> [GridCell, GridCell]
+  const grid = createBlockNode('Grid', {
+    label: '栅格布局',
   }) as LayoutNode;
 
-  root.children = [stack];
+  root.children = [grid];
   page.updatedAt = Date.now();
-  return stack;
 }
 
 watch(activePage, (page) => {
   if (!page) return;
-  ensureRootContainer();
+  ensureDefaultStructure();
 }, { immediate: true });
-
-function setLayout(direction: StackDirection) {
-  ensureRootContainer(direction);
-}
-
 </script>
 
 <template>
@@ -68,27 +50,11 @@ function setLayout(direction: StackDirection) {
       <div class="empty-state-content">
         <div class="empty-icon">🧩</div>
         <h3>选择一个模板开始</h3>
-        <p>左侧模板库点击即可生成结构</p>
+        <p>左侧模板库选择或拖拽组件</p>
       </div>
     </div>
 
     <div v-else class="structure-canvas">
-      <div class="structure-toolbar">
-        <span>布局方向</span>
-        <button
-          :class="{ active: layoutDirection === 'row' }"
-          @click="setLayout('row')"
-        >
-          Row
-        </button>
-        <button
-          :class="{ active: layoutDirection === 'column' }"
-          @click="setLayout('column')"
-        >
-          Col
-        </button>
-      </div>
-
       <TemplateStructureNode
         v-if="rootContainer"
         :node="rootContainer"
@@ -113,33 +79,7 @@ function setLayout(direction: StackDirection) {
   padding: 16px 20px 32px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
 }
-
-.structure-toolbar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 12px;
-  color: var(--text-muted);
-}
-
-.structure-toolbar button {
-  padding: 4px 10px;
-  border-radius: 999px;
-  border: 1px solid var(--border-subtle);
-  background: var(--bg-elevated);
-  color: var(--text-secondary);
-  font-size: 12px;
-  cursor: pointer;
-}
-
-.structure-toolbar button.active {
-  background: var(--accent-primary);
-  color: white;
-  border-color: var(--accent-primary);
-}
-
 
 .empty-state {
   flex: 1;
