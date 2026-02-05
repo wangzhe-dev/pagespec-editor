@@ -4,7 +4,10 @@
  * 简洁的加粗边框盒子，支持拖拽和嵌套
  */
 import { useUIStore } from '@/app/store';
-import { canAddChild } from '@/domain/registry';
+import {
+    createBlockDragGroup,
+    createMoveValidator,
+} from '@/composables/useDragDrop';
 import type { CardNode, LayoutNode } from '@/domain/schema';
 import { computed } from 'vue';
 import Draggable from 'vuedraggable';
@@ -29,22 +32,25 @@ const childrenList = computed<LayoutNode[]>(() => {
   return props.node.children as LayoutNode[];
 });
 
-// 拖拽验证
-function moveBlock(evt: any) {
-  const dragged = evt.draggedContext?.element;
-  const childType = dragged?.kind === 'palette-block'
-    ? dragged.blockType
-    : dragged?.type;
+// 拖拽组配置
+const blockDragGroup = computed(() => createBlockDragGroup());
 
-  if (!childType) return false;
-  return canAddChild(props.node.type, childType);
-}
+// 拖拽验证
+const moveValidator = computed(() => {
+  return createMoveValidator({
+    containerNode: props.node,
+    containerType: props.node.type,
+    childrenList: childrenList.value,
+  });
+});
 
 function onAddBlock(evt: any) {
   const list = childrenList.value;
   const added = list[evt.newIndex];
   if (added?.id) {
-    uiStore.selectNode(added.id);
+    requestAnimationFrame(() => {
+      uiStore.selectNode(added.id);
+    });
   }
 }
 </script>
@@ -67,11 +73,14 @@ function onAddBlock(evt: any) {
     <Draggable
       :list="childrenList"
       item-key="id"
-      :group="{ name: 'blocks', pull: true, put: true }"
-      :animation="150"
+      :group="blockDragGroup"
+      :animation="200"
+      :fallback-on-body="true"
+      :swap-threshold="0.5"
       ghost-class="drag-ghost"
-      handle=".drag-handle"
-      :move="moveBlock"
+      chosen-class="drag-chosen"
+      drag-class="drag-dragging"
+      :move="moveValidator"
       @add="onAddBlock"
       class="card-content"
     >
@@ -82,10 +91,11 @@ function onAddBlock(evt: any) {
           </div>
         </slot>
       </template>
-      <template #footer>
-        <div v-if="childrenList.length === 0" class="drop-zone" />
-      </template>
     </Draggable>
+    <!-- 空状态提示 - 不参与拖拽布局 -->
+    <div v-if="childrenList.length === 0" class="empty-hint">
+      <span>拖放组件到这里</span>
+    </div>
   </div>
 </template>
 
@@ -98,7 +108,8 @@ function onAddBlock(evt: any) {
   background: var(--bg-elevated);
   border-radius: 8px;
   padding: 8px;
-  transition: border-color 0.15s, box-shadow 0.15s;
+  min-height: 80px;
+  transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
   cursor: grab;
 }
 
@@ -137,8 +148,10 @@ function onAddBlock(evt: any) {
   flex-direction: column;
   gap: 8px;
   flex: 1;
-  min-height: 0;
-  overflow-y: auto;
+  min-height: 60px;
+  padding: 4px;
+  border-radius: 4px;
+  transition: background 0.15s;
 }
 
 .child-placeholder {
@@ -153,12 +166,25 @@ function onAddBlock(evt: any) {
   color: var(--text-secondary);
 }
 
-.drop-zone {
-  flex: 1;
-  min-height: 100%;
+/* 空状态提示 - 绝对定位，不影响布局 */
+.empty-hint {
+  position: absolute;
+  inset: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px dashed var(--border-subtle);
+  border-radius: 6px;
+  color: var(--text-muted);
+  font-size: 11px;
+  pointer-events: none;
+  transition: all 0.2s;
 }
 
-.drag-ghost {
-  opacity: 0.6;
+.card-container:hover .empty-hint,
+.card-container.selected .empty-hint {
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+  background: var(--accent-subtle);
 }
 </style>

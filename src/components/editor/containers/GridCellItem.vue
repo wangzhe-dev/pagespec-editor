@@ -3,7 +3,10 @@
  * GridCellItem - 栅格单元格组件
  */
 import { useUIStore } from '@/app/store';
-import { canAddChild } from '@/domain/registry';
+import {
+  createBlockDragGroup,
+  createMoveValidator,
+} from '@/composables/useDragDrop';
 import type { GridCell, LayoutNode } from '@/domain/schema';
 import { computed } from 'vue';
 import Draggable from 'vuedraggable';
@@ -40,24 +43,26 @@ const childrenList = computed<LayoutNode[]>(() => {
   return props.cell.children as LayoutNode[];
 });
 
-// 拖拽验证
-function moveBlock(evt: any) {
-  const dragged = evt.draggedContext?.element;
-  const childType = dragged?.kind === 'palette-block'
-    ? dragged.blockType
-    : dragged?.type;
+// 拖拽组配置
+const blockDragGroup = computed(() => createBlockDragGroup());
 
-  if (!childType) return false;
-  // GridCell 内不允许嵌套 GridCell
-  if (childType === 'GridCell') return false;
-  return canAddChild('GridCell', childType);
-}
+// 拖拽验证
+const moveValidator = computed(() => {
+  return createMoveValidator({
+    containerNode: props.cell,
+    containerType: 'GridCell',
+    disallowedChildTypes: ['GridCell'], // GridCell 内不允许嵌套 GridCell
+    childrenList: childrenList.value,
+  });
+});
 
 function onAddBlock(evt: any) {
   const list = childrenList.value;
   const added = list[evt.newIndex];
   if (added?.id) {
-    uiStore.selectNode(added.id);
+    requestAnimationFrame(() => {
+      uiStore.selectNode(added.id);
+    });
   }
 }
 </script>
@@ -80,11 +85,14 @@ function onAddBlock(evt: any) {
     <Draggable
       :list="childrenList"
       item-key="id"
-      :group="{ name: 'blocks', pull: true, put: true }"
-      :animation="150"
+      :group="blockDragGroup"
+      :animation="200"
+      :fallback-on-body="true"
+      :swap-threshold="0.5"
       ghost-class="drag-ghost"
-      handle=".drag-handle"
-      :move="moveBlock"
+      chosen-class="drag-chosen"
+      drag-class="drag-dragging"
+      :move="moveValidator"
       @add="onAddBlock"
       class="cell-content"
     >
@@ -95,10 +103,11 @@ function onAddBlock(evt: any) {
           </div>
         </slot>
       </template>
-      <template #footer>
-        <div v-if="childrenList.length === 0" class="drop-zone" />
-      </template>
     </Draggable>
+    <!-- 空状态提示 - 不参与拖拽布局 -->
+    <div v-if="childrenList.length === 0" class="empty-hint">
+      <span>拖放组件到这里</span>
+    </div>
   </div>
 </template>
 
@@ -111,9 +120,13 @@ function onAddBlock(evt: any) {
   background: var(--bg-elevated);
   border-radius: 6px;
   padding: 6px;
-  min-height: 140px;
-  cursor: pointer;
-  transition: border-color 0.15s;
+  min-height: 80px;
+  cursor: grab;
+  transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
+}
+
+.grid-cell:active {
+  cursor: grabbing;
 }
 
 .grid-cell.hovered {
@@ -142,21 +155,21 @@ function onAddBlock(evt: any) {
   z-index: 1;
 }
 
-.grid-cell {
-  cursor: grab;
-}
-
-.grid-cell:active {
-  cursor: grabbing;
-}
-
 .cell-content {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 8px;
   flex: 1;
-  min-height: 100px;
-  overflow-y: auto;
+  min-height: 60px;
+  padding: 4px;
+  border-radius: 4px;
+  transition: background 0.15s;
+}
+
+/* 拖拽悬停时高亮内容区域 */
+.cell-content:empty,
+.cell-content.sortable-ghost-parent {
+  background: var(--accent-subtle);
 }
 
 .child-placeholder {
@@ -171,12 +184,25 @@ function onAddBlock(evt: any) {
   color: var(--text-secondary);
 }
 
-.drop-zone {
-  flex: 1;
-  min-height: 100px;
+/* 空状态提示 - 绝对定位，不影响布局 */
+.empty-hint {
+  position: absolute;
+  inset: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px dashed var(--border-subtle);
+  border-radius: 4px;
+  color: var(--text-muted);
+  font-size: 11px;
+  pointer-events: none;
+  transition: all 0.2s;
 }
 
-.drag-ghost {
-  opacity: 0.6;
+.grid-cell:hover .empty-hint,
+.grid-cell.selected .empty-hint {
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+  background: var(--accent-subtle);
 }
 </style>

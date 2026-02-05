@@ -4,8 +4,12 @@
  * 加粗边框盒子风格，右下角类型标签
  */
 import { useUIStore } from '@/app/store';
+import {
+    createBlockDragGroup,
+    createMoveValidator,
+} from '@/composables/useDragDrop';
 import { createBlockNode, getBlockMeta } from '@/domain/registry';
-import type { TabNode, TabsNode } from '@/domain/schema';
+import type { LayoutNode, TabNode, TabsNode } from '@/domain/schema';
 import { Plus, X } from 'lucide-vue-next';
 import { computed, ref, watch } from 'vue';
 import Draggable from 'vuedraggable';
@@ -46,6 +50,15 @@ const activeTab = computed(() =>
   tabList.value.find(t => t.tabKey === activeTabKey.value)
 );
 
+// 当前 Tab 的子节点列表
+const activeTabChildren = computed<LayoutNode[]>(() => {
+  if (!activeTab.value) return [];
+  if (!Array.isArray(activeTab.value.children)) {
+    (activeTab.value as any).children = [];
+  }
+  return activeTab.value.children as LayoutNode[];
+});
+
 // 切换 Tab
 function switchTab(tabKey: string) {
   activeTabKey.value = tabKey;
@@ -76,24 +89,28 @@ function removeTab(tabKey: string, e: Event) {
   }
 }
 
-// Tab 内容拖拽验证
-function moveContent(evt: any) {
-  const dragged = evt.draggedContext?.element;
-  const childType = dragged?.kind === 'palette-block'
-    ? dragged.blockType
-    : dragged?.type;
+// 拖拽组配置
+const blockDragGroup = computed(() => createBlockDragGroup());
 
-  if (!childType) return false;
-  if (childType === 'Tab' || childType === 'Tabs') return false;
-  return true;
-}
+// Tab 内容拖拽验证
+const moveContentValidator = computed(() => {
+  if (!activeTab.value) return () => false;
+  return createMoveValidator({
+    containerNode: activeTab.value,
+    containerType: 'Tab',
+    disallowedChildTypes: ['Tab', 'Tabs'], // Tab 内不允许嵌套 Tab 或 Tabs
+    childrenList: activeTabChildren.value,
+  });
+});
 
 function onAddContent(evt: any) {
   if (activeTab.value) {
     const list = activeTab.value.children || [];
     const added = list[evt.newIndex];
     if (added?.id) {
-      uiStore.selectNode(added.id);
+      requestAnimationFrame(() => {
+        uiStore.selectNode(added.id);
+      });
     }
   }
 }
@@ -142,23 +159,27 @@ function onAddContent(evt: any) {
 
       <Draggable
         v-else
-        :list="activeTab.children || []"
+        :list="activeTabChildren"
         item-key="id"
-        :group="{ name: 'blocks', pull: true, put: true }"
-        :animation="150"
+        :group="blockDragGroup"
+        :animation="200"
+        :fallback-on-body="true"
+        :swap-threshold="0.5"
         ghost-class="drag-ghost"
-        handle=".drag-handle"
-        :move="moveContent"
+        chosen-class="drag-chosen"
+        drag-class="drag-dragging"
+        :move="moveContentValidator"
         @add="onAddContent"
         class="tab-panel"
       >
         <template #item="{ element }">
           <slot name="child" :child="element" :depth="depth + 1" />
         </template>
-        <template #footer>
-          <div class="drop-zone" />
-        </template>
       </Draggable>
+      <!-- 空状态提示 -->
+      <div v-if="activeTabChildren.length === 0" class="empty-hint">
+        <span>拖放组件到这里</span>
+      </div>
     </div>
 
     <!-- 类型标签 -->
@@ -273,11 +294,12 @@ function onAddContent(evt: any) {
 
 /* Tab 内容区 */
 .tabs-content {
+  position: relative;
   padding: 8px;
   flex: 1;
   display: flex;
   flex-direction: column;
-  min-height: 0;
+  min-height: 80px;
 }
 
 .tab-panel {
@@ -315,9 +337,29 @@ function onAddContent(evt: any) {
   color: var(--accent-primary);
 }
 
-.drop-zone {
-  flex: 1;
-  min-height: 100%;
+/* 空状态提示 - 绝对定位，不影响布局 */
+.empty-hint {
+  position: absolute;
+  inset: 8px;
+  top: auto;
+  bottom: 8px;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px dashed var(--border-subtle);
+  border-radius: 6px;
+  color: var(--text-muted);
+  font-size: 11px;
+  pointer-events: none;
+  transition: all 0.2s;
+}
+
+.tabs-container:hover .empty-hint,
+.tabs-container.selected .empty-hint {
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+  background: var(--accent-subtle);
 }
 
 /* 类型标签 */

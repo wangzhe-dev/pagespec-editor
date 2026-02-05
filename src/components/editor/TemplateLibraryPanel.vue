@@ -1,5 +1,10 @@
 <script setup lang="ts">
 import { usePagesStore, useUIStore } from '@/app/store';
+import {
+  clonePaletteBlock,
+  createFieldDragGroup,
+  createPaletteDragGroup,
+} from '@/composables/useDragDrop';
 import { createBlockNode } from '@/domain/registry';
 import type { FormField, LayoutNode } from '@/domain/schema';
 import {
@@ -98,6 +103,10 @@ const activePageName = computed(() => pagesStore.activePage?.name ?? '未创建'
 // 方法
 // ============================================================================
 
+// 拖拽组配置
+const paletteDragGroup = createPaletteDragGroup();
+const fieldPaletteDragGroup = createFieldDragGroup({ pull: 'clone', put: false });
+
 function applyTemplate(template: PageTemplate) {
   const page = pagesStore.createPage(template.name);
   const children = template.create();
@@ -114,8 +123,9 @@ function applyTemplate(template: PageTemplate) {
   }
 }
 
+// 使用公共的克隆函数
 function cloneBlock(item: { type: string }): LayoutNode {
-  return createBlockNode(item.type as any);
+  return clonePaletteBlock(item);
 }
 
 function cloneField(item: { type: string; label: string }): FormField {
@@ -177,12 +187,12 @@ function closeDropdown() {
         :list="containerBlocks"
         :sort="false"
         item-key="type"
-        :group="{ name: 'blocks', pull: 'clone', put: false }"
+        :group="paletteDragGroup"
         :clone="cloneBlock"
         class="block-grid"
       >
         <template #item="{ element }">
-          <div class="block-item container-block">
+          <div class="block-item container-block draggable-item">
             <component :is="element.icon" :size="16" class="block-icon" />
             <span class="block-label">{{ element.label }}</span>
           </div>
@@ -200,12 +210,12 @@ function closeDropdown() {
         :list="unitBlocks"
         :sort="false"
         item-key="type"
-        :group="{ name: 'blocks', pull: 'clone', put: false }"
+        :group="paletteDragGroup"
         :clone="cloneBlock"
         class="block-grid"
       >
         <template #item="{ element }">
-          <div class="block-item unit-block">
+          <div class="block-item unit-block draggable-item">
             <component :is="element.icon" :size="16" class="block-icon" />
             <span class="block-label">{{ element.label }}</span>
           </div>
@@ -223,12 +233,12 @@ function closeDropdown() {
         :list="fieldTypes"
         :sort="false"
         item-key="type"
-        :group="{ name: 'fields', pull: 'clone', put: false }"
+        :group="fieldPaletteDragGroup"
         :clone="cloneField"
         class="field-list"
       >
         <template #item="{ element }">
-          <div class="field-item">
+          <div class="field-item draggable-item">
             <span class="field-dot" />
             <span>{{ element.label }}</span>
           </div>

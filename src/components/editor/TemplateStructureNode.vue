@@ -1,7 +1,12 @@
 <script setup lang="ts">
 import { usePagesStore, useUIStore } from '@/app/store';
-import { canAddChild, createBlockNode, getBlockMeta } from '@/domain/registry';
-import type { BlockType, CardNode, FormNode, GridNode, LayoutNode, TabsNode } from '@/domain/schema';
+import {
+  createBlockDragGroup,
+  createFieldDragGroup,
+  createMoveValidator
+} from '@/composables/useDragDrop';
+import { createBlockNode, getBlockMeta } from '@/domain/registry';
+import type { CardNode, FormNode, GridNode, LayoutNode, TabsNode } from '@/domain/schema';
 import { Copy, GripVertical, Plus, Trash2 } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
 import Draggable from 'vuedraggable';
@@ -52,46 +57,28 @@ const fieldList = computed(() => {
   return form.fields;
 });
 
-function isDescendant(root: LayoutNode, targetId: string): boolean {
-  if (root.id === targetId) return true;
-  if ('children' in root && Array.isArray(root.children)) {
-    return root.children.some((child: LayoutNode) => isDescendant(child, targetId));
-  }
-  return false;
-}
+// 拖拽组配置
+const blockDragGroup = computed(() => createBlockDragGroup());
+const fieldDragGroup = computed(() => createFieldDragGroup());
 
-function resolveDraggedType(element: any): string | null {
-  if (!element || typeof element !== 'object') return null;
-  if (element.kind === 'palette-block') return element.blockType;
-  if (element.type) return element.type;
-  return null;
-}
-
-function moveBlock(evt: any) {
-  const dragged = evt.draggedContext?.element;
-  const targetList = evt.relatedContext?.list as LayoutNode[] | undefined;
-  const sourceList = evt.draggedContext?.list as LayoutNode[] | undefined;
-  const parentMeta = meta.value;
-  const childType = resolveDraggedType(dragged);
-
-  if (!allowChildren.value || !childType || !parentMeta) return false;
-  if (props.node.type === 'Tabs' && childType !== 'Tab') return false;
-  if (!canAddChild(props.node.type, childType as BlockType)) return false;
-
-  if (dragged?.id && isDescendant(dragged as LayoutNode, props.node.id)) return false;
-
-  if (parentMeta.maxChildren && targetList && sourceList !== targetList) {
-    if (targetList.length >= parentMeta.maxChildren) return false;
-  }
-
-  return true;
-}
+// 拖拽验证函数
+const moveBlockValidator = computed(() => {
+  return createMoveValidator({
+    containerNode: props.node,
+    containerType: props.node.type,
+    maxChildren: meta.value?.maxChildren,
+    childrenList: childrenList.value,
+  });
+});
 
 function onAddBlock(evt: any) {
   const list = childrenList.value;
   const added = list[evt.newIndex];
   if (added?.id) {
-    uiStore.selectNode(added.id);
+    // 延迟选中，确保 DOM 更新完成
+    requestAnimationFrame(() => {
+      uiStore.selectNode(added.id);
+    });
   }
 }
 
@@ -244,11 +231,14 @@ function deleteNode() {
         v-if="allowChildren && !isSpecialContainer"
         :list="childrenList"
         item-key="id"
-        :group="{ name: 'blocks', pull: true, put: true }"
-        :animation="150"
+        :group="blockDragGroup"
+        :animation="200"
+        :fallback-on-body="true"
+        :swap-threshold="0.5"
         ghost-class="drag-ghost"
-        handle=".drag-handle"
-        :move="moveBlock"
+        chosen-class="drag-chosen"
+        drag-class="drag-dragging"
+        :move="moveBlockValidator"
         @add="onAddBlock"
         class="node-children layout-column"
         :class="{ canvas: !showCard }"
@@ -271,8 +261,9 @@ function deleteNode() {
         v-else-if="isForm"
         :list="fieldList"
         item-key="key"
-        :group="{ name: 'fields', pull: true, put: true }"
-        :animation="150"
+        :group="fieldDragGroup"
+        :animation="200"
+        :fallback-on-body="true"
         ghost-class="drag-ghost"
         @add="onAddField"
         class="form-fields"
@@ -378,17 +369,24 @@ function deleteNode() {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  padding: 8px 10px;
+  padding: 12px 16px;
   border-radius: 8px;
-  border: 1px dashed var(--border-subtle);
+  border: 2px dashed var(--border-subtle);
   color: var(--text-muted);
   font-size: 11px;
+  transition: all 0.2s;
+}
+
+.drop-slot:hover {
+  border-color: var(--accent-primary);
+  background: var(--accent-subtle);
+  color: var(--accent-primary);
 }
 
 .drop-slot.empty {
   flex: 1;
   width: 100%;
-  min-height: 140px;
+  min-height: 100px;
 }
 
 .form-fields {

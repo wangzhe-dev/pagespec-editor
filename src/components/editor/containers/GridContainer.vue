@@ -4,7 +4,11 @@
  * 用于在编辑器中可视化 Grid 布局结构
  */
 import { useUIStore } from '@/app/store';
-import type { GridCell, GridNode } from '@/domain/schema';
+import {
+  createBlockDragGroup,
+  resolveDraggedType,
+} from '@/composables/useDragDrop';
+import type { GridNode, LayoutNode } from '@/domain/schema';
 import { computed } from 'vue';
 import Draggable from 'vuedraggable';
 import NodeActions from '../NodeActions.vue';
@@ -21,12 +25,12 @@ const isSelected = computed(() => uiStore.selectedNodeId === props.node.id);
 const isHovered = computed(() => uiStore.hoveredNodeId === props.node.id);
 const showActions = computed(() => isSelected.value || isHovered.value);
 
-// 获取子节点列表
-const cellList = computed<GridCell[]>(() => {
+// 获取子节点列表（可以是 GridCell 或其他组件）
+const cellList = computed<LayoutNode[]>(() => {
   if (!Array.isArray(props.node.children)) {
     (props.node as any).children = [];
   }
-  return props.node.children as GridCell[];
+  return props.node.children as LayoutNode[];
 });
 
 // 计算 Grid 样式（使用真正的 CSS Grid）
@@ -70,32 +74,37 @@ const gridStyle = computed(() => {
     display: 'grid',
     gridTemplateColumns,
     gridTemplateRows,
-    gridAutoRows: 'minmax(140px, auto)',
+    gridAutoRows: 'auto',
     gap: gapValue,
     alignItems: 'stretch',
   };
 });
 
-// 拖拽验证 - 只允许 GridCell
-function moveBlock(evt: any) {
+// 拖拽组配置 - 使用通用 blocks group，接收任何组件
+const blockDragGroup = computed(() => createBlockDragGroup());
+
+// 拖拽验证 - 允许任何容器组件直接放入 Grid
+function moveValidator(evt: any): boolean {
   const dragged = evt.draggedContext?.element;
-  const childType = dragged?.kind === 'palette-block'
-    ? dragged.blockType
-    : dragged?.type;
+  const childType = resolveDraggedType(dragged);
 
-  if (childType && childType !== 'GridCell') {
-    return false;
-  }
+  if (!childType) return false;
 
-  return true;
+  // 允许的类型：GridCell 和其他容器/数据组件
+  const allowedTypes = ['GridCell', 'Card', 'Tabs', 'Grid', 'Table', 'Tree', 'Form', 'Chart'];
+  return allowedTypes.includes(childType);
 }
 
+// 添加时选中新节点（不再自动包装）
 function onAddCell(evt: any) {
   const list = cellList.value;
   const added = list[evt.newIndex];
-  if (added?.id) {
+
+  if (!added) return;
+
+  requestAnimationFrame(() => {
     uiStore.selectNode(added.id);
-  }
+  });
 }
 </script>
 
@@ -115,24 +124,33 @@ function onAddCell(evt: any) {
     <Draggable
       :list="cellList"
       item-key="id"
-      :group="{ name: 'grid-cells', pull: true, put: true }"
-      :animation="150"
+      :group="blockDragGroup"
+      :animation="200"
+      :fallback-on-body="true"
+      :swap-threshold="0.65"
       ghost-class="drag-ghost"
-      handle=".drag-handle"
-      :move="moveBlock"
+      chosen-class="drag-chosen"
+      drag-class="drag-dragging"
+      :move="moveValidator"
       @add="onAddCell"
       class="grid-canvas"
       :style="gridStyle"
     >
       <template #item="{ element }">
-        <GridCellItem
-          :cell="element"
-          :depth="depth + 1"
-        >
-          <template #child="{ child, depth: childDepth }">
-            <slot name="child" :child="child" :depth="childDepth" />
-          </template>
-        </GridCellItem>
+        <div class="grid-item-wrapper">
+          <!-- GridCell 使用专门的组件渲染 -->
+          <GridCellItem
+            v-if="element.type === 'GridCell'"
+            :cell="element"
+            :depth="depth + 1"
+          >
+            <template #child="{ child, depth: childDepth }">
+              <slot name="child" :child="child" :depth="childDepth" />
+            </template>
+          </GridCellItem>
+          <!-- 其他组件直接通过 slot 渲染 -->
+          <slot v-else name="child" :child="element" :depth="depth + 1" />
+        </div>
       </template>
     </Draggable>
   </div>
@@ -203,6 +221,10 @@ function onAddCell(evt: any) {
 
 .grid-canvas {
   min-height: 60px;
+}
+
+.grid-item-wrapper {
+  display: contents;
 }
 
 .drop-slot {

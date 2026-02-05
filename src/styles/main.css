@@ -169,3 +169,109 @@ pre {
   white-space: nowrap;
   border: 0;
 }
+
+/* ============================================================================
+   Drag & Drop Global Styles
+   ============================================================================ */
+
+/* Ghost element - 拖拽时的半透明占位符 */
+.drag-ghost {
+  opacity: 0.5;
+  background: var(--accent-subtle) !important;
+  border: 2px dashed var(--accent-primary) !important;
+  border-radius: 8px !important;
+}
+
+/* Chosen element - 被选中准备拖拽的元素 */
+.drag-chosen {
+  opacity: 0.9;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3) !important;
+  transform: scale(1.02);
+  z-index: 1000;
+}
+
+/* Dragging element - 正在被拖拽的元素 */
+.drag-dragging {
+  opacity: 0.9;
+  cursor: grabbing !important;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4) !important;
+}
+
+/* 拖拽排序动画 */
+.sortable-drag {
+  opacity: 0.9;
+}
+
+/* 拖拽时其他元素的过渡动画 */
+.sortable-ghost ~ * {
+  transition: transform 0.2s ease;
+}
+
+/* 拖拽放置指示器样式 */
+.drop-indicator {
+  position: relative;
+}
+
+.drop-indicator::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--accent-primary);
+  border-radius: 2px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.drop-indicator.drop-before::before {
+  top: -2px;
+  opacity: 1;
+}
+
+.drop-indicator.drop-after::before {
+  bottom: -2px;
+  opacity: 1;
+}
+
+/* 空容器的放置区域样式 */
+.drop-zone {
+  min-height: 60px;
+  border: 2px dashed var(--border-subtle);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  font-size: 12px;
+  transition: all 0.2s;
+}
+
+.drop-zone:hover,
+.drop-zone.drag-over {
+  border-color: var(--accent-primary);
+  background: var(--accent-subtle);
+  color: var(--accent-primary);
+}
+
+/* 禁止放置时的视觉反馈 */
+.drop-forbidden {
+  cursor: not-allowed !important;
+  border-color: var(--danger) !important;
+  background: var(--danger-subtle) !important;
+}
+
+/* 可拖拽元素的通用样式 */
+.draggable-item {
+  cursor: grab;
+  user-select: none;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.draggable-item:hover {
+  transform: translateY(-1px);
+}
+
+.draggable-item:active {
+  cursor: grabbing;
+}
