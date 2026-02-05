@@ -29,6 +29,10 @@ const props = defineProps<{
   rowUnit: number;
   maxRowSpan: number;
   activeResizeEdge?: ResizeEdge | null;
+  /** 拖拽时的边框方向高亮（区别于 resize） */
+  dragEdge?: ResizeEdge | null;
+  /** 是否为拖拽目标（放置指示） */
+  isDropTarget?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -44,8 +48,13 @@ const cellRef = ref<HTMLElement | null>(null);
 
 const hoverEdge = ref<ResizeEdge | null>(null);
 
-// 激活的边来自父组件（统一 resize 状态）
-const edgeHighlight = computed(() => props.activeResizeEdge ?? hoverEdge.value);
+// 激活的边来自父组件（统一 resize 状态）或拖拽状态
+const edgeHighlight = computed(() => {
+  // 拖拽边框优先级最高
+  if (props.dragEdge) return props.dragEdge;
+  // 然后是 resize 边框
+  return props.activeResizeEdge ?? hoverEdge.value;
+});
 
 // 单元格样式（使用 colStart 明确定位，支持独立调整宽度）
 const cellStyle = computed(() => {
@@ -140,7 +149,10 @@ function onAddBlock(evt: any) {
   <div
     ref="cellRef"
     class="grid-cell drag-handle"
-    :class="[{ selected: isSelected, hovered: isHovered }, edgeHighlight && `edge-${edgeHighlight}`]"
+    :class="[
+      { selected: isSelected, hovered: isHovered, 'drop-target': isDropTarget },
+      edgeHighlight && `edge-${edgeHighlight}`
+    ]"
     :style="cellStyle"
     @click.stop="uiStore.selectNode(cell.id)"
     @mouseenter.stop="uiStore.hoverNode(cell.id)"
@@ -233,6 +245,13 @@ function onAddBlock(evt: any) {
 .grid-cell.selected {
   border-color: var(--accent-primary);
   box-shadow: var(--edge-shadow), 0 0 0 2px rgba(var(--accent-primary-rgb), 0.15);
+}
+
+/* 拖拽目标高亮 */
+.grid-cell.drop-target {
+  border-color: var(--accent-secondary, #10b981);
+  background: rgba(16, 185, 129, 0.08);
+  box-shadow: var(--edge-shadow), 0 0 0 2px rgba(16, 185, 129, 0.2);
 }
 
 .grid-cell.edge-left {
