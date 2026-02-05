@@ -1,20 +1,38 @@
 <script setup lang="ts">
 /**
  * GridCellItem - 栅格单元格组件
+ * Resize 逻辑由父组件 GridContainer 统一处理，实现相邻 cell 联动
  */
 import { useUIStore } from '@/app/store';
 import {
-  createBlockDragGroup,
-  createMoveValidator,
+    createBlockDragGroup,
+    createMoveValidator,
 } from '@/composables/useDragDrop';
 import type { GridCell, LayoutNode } from '@/domain/schema';
-import { computed } from 'vue';
+import { computed, ref, watch } from 'vue';
 import Draggable from 'vuedraggable';
 import NodeActions from '../NodeActions.vue';
+
+export type ResizeEdge = 'left' | 'right' | 'top' | 'bottom';
+
+export interface ResizeStartPayload {
+  cellId: string;
+  edge: ResizeEdge;
+  event: PointerEvent;
+  cellEl: HTMLElement;
+}
 
 const props = defineProps<{
   cell: GridCell;
   depth: number;
+  totalColumns: number;
+  rowUnit: number;
+  maxRowSpan: number;
+  activeResizeEdge?: ResizeEdge | null;
+}>();
+
+const emit = defineEmits<{
+  (e: 'resize-start', payload: ResizeStartPayload): void;
 }>();
 
 const uiStore = useUIStore();
@@ -22,13 +40,25 @@ const uiStore = useUIStore();
 const isSelected = computed(() => uiStore.selectedNodeId === props.cell.id);
 const isHovered = computed(() => uiStore.hoveredNodeId === props.cell.id);
 const showActions = computed(() => isSelected.value || isHovered.value);
+const cellRef = ref<HTMLElement | null>(null);
 
-// 单元格样式（支持 CSS Grid 跨行跨列）
+const hoverEdge = ref<ResizeEdge | null>(null);
+
+// 激活的边来自父组件（统一 resize 状态）
+const edgeHighlight = computed(() => props.activeResizeEdge ?? hoverEdge.value);
+
+// 单元格样式（使用 colStart 明确定位，支持独立调整宽度）
 const cellStyle = computed(() => {
-  const { colSpan, rowSpan, justifySelf, alignSelf, padding } = props.cell;
+  const { colStart, colSpan, rowStart, rowSpan, justifySelf, alignSelf, padding } = props.cell;
+  const start = colStart ?? 1;
+  const span = colSpan ?? 1;
+  const rStart = rowStart ?? 1;
+  const rSpan = rowSpan ?? 1;
+
   return {
-    gridColumn: colSpan && colSpan > 1 ? `span ${colSpan}` : undefined,
-    gridRow: rowSpan && rowSpan > 1 ? `span ${rowSpan}` : undefined,
+    // 使用明确的起始位置 + span，而不是自动流动
+    gridColumn: `${start} / span ${span}`,
+    gridRow: rSpan > 1 ? `${rStart} / span ${rSpan}` : undefined,
     justifySelf: justifySelf || undefined,
     alignSelf: alignSelf || undefined,
     padding: padding ? `${padding}px` : undefined,
@@ -56,6 +86,45 @@ const moveValidator = computed(() => {
   });
 });
 
+function setHover(edge: ResizeEdge) {
+  if (props.activeResizeEdge) return;
+  hoverEdge.value = edge;
+}
+
+function clearHover(edge: ResizeEdge) {
+  if (props.activeResizeEdge) return;
+  if (hoverEdge.value === edge) {
+    hoverEdge.value = null;
+  }
+}
+
+function onResizeStart(edge: ResizeEdge, event: PointerEvent) {
+  event.stopPropagation();
+  event.preventDefault();
+  const cellEl = cellRef.value;
+  if (!cellEl) return;
+
+  // 通知父组件开始 resize，由父组件统一处理相邻 cell 联动
+  emit('resize-start', {
+    cellId: props.cell.id,
+    edge,
+    event,
+    cellEl,
+  });
+}
+
+function onCellLeave() {
+  uiStore.hoverNode(null);
+  hoverEdge.value = null;
+}
+
+// 当父组件结束 resize 时清理 hover 状态
+watch(() => props.activeResizeEdge, (val) => {
+  if (!val) {
+    hoverEdge.value = null;
+  }
+});
+
 function onAddBlock(evt: any) {
   const list = childrenList.value;
   const added = list[evt.newIndex];
@@ -69,13 +138,39 @@ function onAddBlock(evt: any) {
 
 <template>
   <div
+    ref="cellRef"
     class="grid-cell drag-handle"
-    :class="{ selected: isSelected, hovered: isHovered }"
+    :class="[{ selected: isSelected, hovered: isHovered }, edgeHighlight && `edge-${edgeHighlight}`]"
     :style="cellStyle"
     @click.stop="uiStore.selectNode(cell.id)"
     @mouseenter.stop="uiStore.hoverNode(cell.id)"
-    @mouseleave.stop="uiStore.hoverNode(null)"
+    @mouseleave.stop="onCellLeave"
   >
+    <div
+      class="resize-handle handle-left"
+      @pointerdown="onResizeStart('left', $event)"
+      @mouseenter="setHover('left')"
+      @mouseleave="clearHover('left')"
+    />
+    <div
+      class="resize-handle handle-right"
+      @pointerdown="onResizeStart('right', $event)"
+      @mouseenter="setHover('right')"
+      @mouseleave="clearHover('right')"
+    />
+    <div
+      class="resize-handle handle-top"
+      @pointerdown="onResizeStart('top', $event)"
+      @mouseenter="setHover('top')"
+      @mouseleave="clearHover('top')"
+    />
+    <div
+      class="resize-handle handle-bottom"
+      @pointerdown="onResizeStart('bottom', $event)"
+      @mouseenter="setHover('bottom')"
+      @mouseleave="clearHover('bottom')"
+    />
+
     <div v-if="showActions" class="type-badge">
       <span>Cell</span>
       <NodeActions :node="cell" :show="showActions" />
@@ -120,8 +215,10 @@ function onAddBlock(evt: any) {
   background: var(--bg-elevated);
   border-radius: 6px;
   padding: 6px;
-  min-height: 80px;
+  min-height: calc(var(--grid-row-unit, 8px) * 2);
   cursor: grab;
+  --edge-shadow: none;
+  box-shadow: var(--edge-shadow);
   transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
 }
 
@@ -135,7 +232,61 @@ function onAddBlock(evt: any) {
 
 .grid-cell.selected {
   border-color: var(--accent-primary);
-  box-shadow: 0 0 0 2px rgba(var(--accent-primary-rgb), 0.15);
+  box-shadow: var(--edge-shadow), 0 0 0 2px rgba(var(--accent-primary-rgb), 0.15);
+}
+
+.grid-cell.edge-left {
+  --edge-shadow: inset 3px 0 0 var(--accent-primary);
+}
+
+.grid-cell.edge-right {
+  --edge-shadow: inset -3px 0 0 var(--accent-primary);
+}
+
+.grid-cell.edge-top {
+  --edge-shadow: inset 0 3px 0 var(--accent-primary);
+}
+
+.grid-cell.edge-bottom {
+  --edge-shadow: inset 0 -3px 0 var(--accent-primary);
+}
+
+.resize-handle {
+  position: absolute;
+  z-index: 2;
+  background: transparent;
+}
+
+.handle-left {
+  top: -2px;
+  left: -2px;
+  width: 8px;
+  height: calc(100% + 4px);
+  cursor: ew-resize;
+}
+
+.handle-right {
+  top: -2px;
+  right: -2px;
+  width: 8px;
+  height: calc(100% + 4px);
+  cursor: ew-resize;
+}
+
+.handle-top {
+  top: -2px;
+  left: -2px;
+  width: calc(100% + 4px);
+  height: 8px;
+  cursor: ns-resize;
+}
+
+.handle-bottom {
+  bottom: -2px;
+  left: -2px;
+  width: calc(100% + 4px);
+  height: 8px;
+  cursor: ns-resize;
 }
 
 .type-badge {

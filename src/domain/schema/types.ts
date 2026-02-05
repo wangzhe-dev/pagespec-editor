@@ -68,6 +68,7 @@ export const GridCellSchema = BaseNodeSchema.extend({
   // 位置与尺寸（基于 CSS Grid）
   colStart: z.number().default(1),      // grid-column-start
   colSpan: z.number().default(1),       // 占几列
+  colSpanLocked: z.boolean().default(false), // 是否锁定列宽
   rowStart: z.number().default(1),      // grid-row-start
   rowSpan: z.number().default(1),       // 占几行
   // 对齐
@@ -85,7 +86,7 @@ export const GridNodeSchema = BaseNodeSchema.extend({
   columns: z.union([
     z.number(),                         // 固定列数，如 3
     z.string(),                         // 自定义模板，如 "1fr 2fr 1fr" 或 "repeat(4, 1fr)"
-  ]).default(3),
+  ]).default(24),
   // 行配置
   rows: z.union([
     z.number(),                         // 固定行数

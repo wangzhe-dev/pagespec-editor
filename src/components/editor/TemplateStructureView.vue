@@ -6,7 +6,6 @@ import {
 } from '@/composables/useDragDrop';
 import { createBlockNode } from '@/domain/registry';
 import type { LayoutNode } from '@/domain/schema';
-import { Plus } from 'lucide-vue-next';
 import { computed, watchEffect } from 'vue';
 import Draggable from 'vuedraggable';
 import TemplateStructureNode from './TemplateStructureNode.vue';
@@ -114,12 +113,12 @@ watchEffect(() => {
             :show-card="true"
           />
         </template>
-        <template #footer>
+        <!-- <template #footer>
           <div class="drop-slot" :class="{ empty: rootChildren.length === 0 }">
             <Plus :size="14" />
             <span>拖拽组件到此处添加新区块</span>
           </div>
-        </template>
+        </template> -->
       </Draggable>
     </div>
   </div>

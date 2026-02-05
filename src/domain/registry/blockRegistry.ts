@@ -79,14 +79,14 @@ blockRegistry.set('Grid', {
   allowChildren: true,
   defaultProps: {
     type: 'Grid',
-    columns: 2,
+    columns: 24,
     gap: 12,
     justifyItems: 'stretch',
     alignItems: 'stretch',
     // 默认包含两个 Cell，用户可通过复制按钮增加更多
     children: [
-      { id: '__cell1__', type: 'GridCell', label: '左侧区域', children: [] },
-      { id: '__cell2__', type: 'GridCell', label: '右侧区域', children: [] },
+      { id: '__cell1__', type: 'GridCell', label: '左侧区域', colSpan: 12, rowSpan: 6, children: [] },
+      { id: '__cell2__', type: 'GridCell', label: '右侧区域', colSpan: 12, rowSpan: 6, children: [] },
     ],
   },
   propertySchema: [
@@ -96,7 +96,7 @@ blockRegistry.set('Grid', {
       type: 'text',
       placeholder: '3 或 1fr 2fr 1fr',
       description: '数字表示等宽列，字符串支持完整 grid-template-columns',
-      defaultValue: '3',
+      defaultValue: '24',
     },
     {
       key: 'rows',
@@ -155,16 +155,18 @@ blockRegistry.set('GridCell', {
   defaultProps: {
     type: 'GridCell',
     colStart: 1,
-    colSpan: 1,
+    colSpan: 12,
+    colSpanLocked: false,
     rowStart: 1,
-    rowSpan: 1,
+    rowSpan: 6,
     children: [],
   },
   propertySchema: [
-    { key: 'colSpan', label: '跨列数', type: 'number', defaultValue: 1, min: 1, max: 12 },
-    { key: 'rowSpan', label: '跨行数', type: 'number', defaultValue: 1, min: 1, max: 12 },
+    { key: 'colSpan', label: '跨列数', type: 'number', defaultValue: 12, min: 1, max: 24 },
+    { key: 'rowSpan', label: '跨行数', type: 'number', defaultValue: 6, min: 1, max: 60 },
   ],
   advancedSchema: [
+    { key: 'colSpanLocked', label: '锁定列宽', type: 'boolean', defaultValue: false },
     { key: 'colStart', label: '起始列', type: 'number', defaultValue: 1, min: 1 },
     { key: 'rowStart', label: '起始行', type: 'number', defaultValue: 1, min: 1 },
     {
