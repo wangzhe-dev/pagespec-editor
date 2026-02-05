@@ -7,15 +7,15 @@
  */
 import { useUIStore } from '@/app/store';
 import {
-    createBlockDragGroup,
-    resolveDraggedType,
+  createBlockDragGroup,
+  createMoveValidator,
 } from '@/composables/useDragDrop';
 import {
-    computeIndicatorPosition,
-    useEdgeDrag,
-    type DropPosition,
-    type EdgeDirection
+  computeIndicatorPosition,
+  useEdgeDrag,
+  type EdgeDirection
 } from '@/composables/useEdgeDrag';
+import { createBlockNode } from '@/domain/registry';
 import type { GridCell, GridNode, LayoutNode } from '@/domain/schema';
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import Draggable from 'vuedraggable';
@@ -98,21 +98,18 @@ function splitRows(nodes: LayoutNode[]): LayoutNode[][] {
 function getGridItemStyle(node: LayoutNode) {
   if (node.type === 'GridCell') {
     const cell = node as GridCell;
-    const start = clamp(cell.colStart ?? 1, 1, GRID_COLUMNS);
     const span = clamp(cell.colSpan ?? 1, 1, GRID_COLUMNS);
-    const rStart = clamp(cell.rowStart ?? 1, 1, MAX_ROW_SPAN);
     const rSpan = clamp(cell.rowSpan ?? 1, 1, MAX_ROW_SPAN);
 
     return {
-      gridColumn: `${start} / span ${span}`,
-      gridRow: rSpan > 1 ? `${rStart} / span ${rSpan}` : undefined,
-      justifySelf: cell.justifySelf || undefined,
+      '--grid-span': span,
+      minHeight: rSpan > 1 ? `calc(${rSpan} * var(--grid-row-unit))` : undefined,
       alignSelf: cell.alignSelf || undefined,
     };
   }
 
   return {
-    gridColumn: `1 / span ${GRID_COLUMNS}`,
+    '--grid-span': GRID_COLUMNS,
   };
 }
 
@@ -167,6 +164,21 @@ function initializeCellPositions(cells: GridCell[], reason: 'init' | 'add' | 'dr
   // resize 时不重新分配位置
   if (reason === 'resize') return;
 
+  // 检查是否所有 cell 都已有有效的 colSpan（说明是已配置好的 Grid）
+  const allHaveValidSpan = cells.every(cell =>
+    cell.colSpan != null && cell.colSpan >= 1
+  );
+
+  // 如果所有 cell 都已有有效 colSpan，只需要重新计算 colStart 位置
+  if (allHaveValidSpan && reason === 'structure') {
+    let nextStart = 1;
+    cells.forEach(cell => {
+      cell.colStart = nextStart;
+      nextStart += cell.colSpan ?? 1;
+    });
+    return;
+  }
+
   // 检查是否所有 cell 都已有有效的 colStart（非新添加的情况）
   const allHavePosition = cells.every(cell =>
     cell.colStart != null && cell.colStart >= 1 && cell.colSpanLocked
@@ -190,14 +202,18 @@ function initializeCellPositions(cells: GridCell[], reason: 'init' | 'add' | 'dr
     // 为未锁定的 cell 分配位置
     cell.colStart = nextStart;
 
-    // 计算默认宽度：平均分配剩余空间
-    const remainingCells = cells.length - index;
-    const remainingSpace = GRID_COLUMNS - nextStart + 1;
-    const defaultSpan = Math.max(1, Math.floor(remainingSpace / remainingCells));
+    // 如果 cell 已有 colSpan，保留它
+    if (cell.colSpan != null && cell.colSpan >= 1) {
+      cell.colSpan = clamp(cell.colSpan, 1, GRID_COLUMNS - nextStart + 1);
+    } else {
+      // 计算默认宽度：平均分配剩余空间
+      const remainingCells = cells.length - index;
+      const remainingSpace = GRID_COLUMNS - nextStart + 1;
+      const defaultSpan = Math.max(1, Math.floor(remainingSpace / remainingCells));
+      cell.colSpan = clamp(defaultSpan, 1, GRID_COLUMNS - nextStart + 1);
+    }
 
-    cell.colSpan = clamp(cell.colSpan ?? defaultSpan, 1, GRID_COLUMNS - nextStart + 1);
     cell.rowSpan = clamp(cell.rowSpan ?? 1, 1, MAX_ROW_SPAN);
-
     nextStart = cell.colStart + cell.colSpan;
   });
 }
@@ -213,16 +229,26 @@ function normalizeRow(row: LayoutNode[], reason: 'init' | 'add' | 'drag' | 'resi
   // 只处理一个 cell 的特殊情况
   if (gridCells.length === 1) {
     const cell = gridCells[0];
-    if (!cell.colSpanLocked || reason === 'add' || reason === 'drag' || reason === 'structure') {
-      cell.colStart = 1;
-      cell.colSpan = GRID_COLUMNS;
-      cell.colSpanLocked = false;
-    }
+    cell.colStart = 1;
+    cell.colSpan = clamp(cell.colSpan ?? GRID_COLUMNS, 1, GRID_COLUMNS);
     return;
   }
 
   // 初始化 cell 位置
   initializeCellPositions(gridCells, reason);
+}
+
+function ensureGridCellList() {
+  const list = cellList.value;
+  for (let i = 0; i < list.length; i++) {
+    const node = list[i];
+    if (node.type === 'GridCell') continue;
+    const wrapped = createBlockNode('GridCell', {
+      label: '单元格',
+      children: [node],
+    }) as GridCell;
+    list.splice(i, 1, wrapped);
+  }
 }
 
 let isNormalizing = false;
@@ -231,6 +257,9 @@ function normalizeGridLayout(reason: 'init' | 'add' | 'drag' | 'resize' | 'struc
   isNormalizing = true;
 
   try {
+    if (reason !== 'resize') {
+      ensureGridCellList();
+    }
     const nodes = cellList.value;
     const rows = splitRows(nodes);
     rows.forEach(row => normalizeRow(row, reason));
@@ -244,8 +273,6 @@ function normalizeGridLayout(reason: 'init' | 'add' | 'drag' | 'resize' | 'struc
 // 当前正在 resize 的 cell id 和边
 const resizingCellId = ref<string | null>(null);
 const resizingEdge = ref<ResizeEdge | null>(null);
-const draggingCellId = ref<string | null>(null);
-const dragStartRowIndex = ref<number | null>(null);
 
 // Grid 容器 DOM 引用
 const gridCanvasRef = ref<HTMLElement | null>(null);
@@ -512,34 +539,30 @@ onBeforeUnmount(() => {
 // ============= 计算 Grid 样式 =============
 
 const gridStyle = computed(() => {
-  const { gap, rows } = props.node;
+  const { gap } = props.node;
 
   // 解析间距
   let gapValue = '12px';
+  let gapRow = 12;
+  let gapCol = 12;
   if (typeof gap === 'number') {
     gapValue = `${gap}px`;
+    gapRow = gap;
+    gapCol = gap;
   } else if (gap && typeof gap === 'object') {
     gapValue = `${gap.row}px ${gap.col}px`;
-  }
-
-  // 解析列模板
-  const gridTemplateColumns = `repeat(${GRID_COLUMNS}, minmax(0, 1fr))`;
-
-  // 解析行模板
-  let gridTemplateRows: string | undefined;
-  if (rows) {
-    if (typeof rows === 'string') {
-      gridTemplateRows = rows;
-    }
+    gapRow = gap.row;
+    gapCol = gap.col;
   }
 
   return {
-    display: 'grid',
-    gridTemplateColumns,
-    gridTemplateRows,
-    gridAutoRows: `minmax(${GRID_ROW_UNIT}px, auto)`,
+    display: 'flex',
+    flexWrap: 'wrap',
     gap: gapValue,
     alignItems: 'stretch',
+    '--grid-columns': `${GRID_COLUMNS}`,
+    '--grid-gap-col': `${gapCol}px`,
+    '--grid-gap-row': `${gapRow}px`,
     '--grid-row-unit': `${GRID_ROW_UNIT}px`,
   };
 });
@@ -547,16 +570,17 @@ const gridStyle = computed(() => {
 // 拖拽组配置 - 使用通用 blocks group，接收任何组件
 const blockDragGroup = computed(() => createBlockDragGroup());
 
-// 拖拽验证 - 允许任何容器组件直接放入 Grid
+const baseMoveValidator = computed(() => {
+  return createMoveValidator({
+    containerNode: props.node,
+    containerType: 'Grid',
+    childrenList: cellList.value,
+  });
+});
+
+// 拖拽验证 - 使用通用规则（Grid 允许任何 Block）
 function moveValidator(evt: any): boolean {
-  const dragged = evt.draggedContext?.element;
-  const childType = resolveDraggedType(dragged);
-
-  if (!childType) return false;
-
-  // 允许的类型：GridCell 和其他容器/数据组件
-  const allowedTypes = ['GridCell', 'Card', 'Tabs', 'Grid', 'Table', 'Tree', 'Form', 'Chart'];
-  return allowedTypes.includes(childType);
+  return baseMoveValidator.value(evt);
 }
 
 function onGridMove(evt: any): boolean {
@@ -627,12 +651,25 @@ function onGridMove(evt: any): boolean {
   return false;
 }
 
-// 添加时选中新节点（不再自动包装）
+// 添加时选中新节点（Grid 强制使用 GridCell 包裹）
 function onAddCell(evt: any) {
   const list = cellList.value;
   const added = list[evt.newIndex];
 
   if (!added) return;
+
+  if (added.type !== 'GridCell') {
+    const wrapped = createBlockNode('GridCell', {
+      label: '单元格',
+      children: [added],
+    }) as GridCell;
+    list.splice(evt.newIndex, 1, wrapped);
+    normalizeGridLayout('add');
+    requestAnimationFrame(() => {
+      uiStore.selectNode(wrapped.id);
+    });
+    return;
+  }
 
   normalizeGridLayout('add');
   requestAnimationFrame(() => {
@@ -643,20 +680,13 @@ function onAddCell(evt: any) {
 function onDragStart(evt: any) {
   const index = evt?.oldIndex;
   if (typeof index !== 'number') {
-    draggingCellId.value = null;
-    dragStartRowIndex.value = null;
     return;
   }
 
   const dragged = cellList.value[index];
   if (!dragged || dragged.type !== 'GridCell') {
-    draggingCellId.value = null;
-    dragStartRowIndex.value = null;
     return;
   }
-
-  draggingCellId.value = dragged.id;
-  dragStartRowIndex.value = getRowIndexById(dragged.id);
 
   // 启动边框感知拖拽（使用鼠标/触摸位置）
   const point = getClientPoint(evt);
@@ -674,122 +704,11 @@ function onDragStart(evt: any) {
   } as any);
 }
 
-function onDragEnd(evt: any) {
-  // 获取边框感知拖拽结果
-  const edgeDragResult = edgeDrag.onDragEnd();
-
-  const cellId = draggingCellId.value;
-  const startRow = dragStartRowIndex.value;
-
-  // 如果有边框感知的放置位置，使用它来调整
-  if (edgeDragResult.dropPosition && edgeDragResult.draggedId) {
-    applyDropPosition(edgeDragResult.draggedId, edgeDragResult.dropPosition, evt);
-  } else if (cellId && startRow != null) {
-    // 回退到原有逻辑
-    const endRow = getRowIndexById(cellId);
-    if (endRow !== -1 && endRow !== startRow) {
-      const cell = findCell(cellId);
-      if (cell) {
-        cell.colStart = 1;
-        cell.colSpan = GRID_COLUMNS;
-        cell.colSpanLocked = true;
-      }
-    }
-  }
-
-  draggingCellId.value = null;
-  dragStartRowIndex.value = null;
-
+function onDragEnd() {
+  edgeDrag.onDragEnd();
   normalizeGridLayout('drag');
 }
 
-/**
- * 根据边框感知的放置位置调整 Cell
- */
-function applyDropPosition(draggedId: string, dropPos: DropPosition, evt: any) {
-  if (!dropPos) return;
-
-  const list = cellList.value;
-  const draggedIndex = list.findIndex(n => n.id === draggedId);
-  if (draggedIndex === -1) return;
-
-  const dragged = list[draggedIndex] as GridCell;
-
-  switch (dropPos.type) {
-    case 'before':
-    case 'after': {
-      const targetIndex = list.findIndex(n => n.id === dropPos.targetId);
-      if (targetIndex === -1) return;
-
-      const target = list[targetIndex] as GridCell;
-
-      // 从原位置移除
-      list.splice(draggedIndex, 1);
-
-      // 计算新的插入位置（考虑删除后的索引变化）
-      let insertIndex = targetIndex;
-      if (draggedIndex < targetIndex) {
-        insertIndex--;
-      }
-      if (dropPos.type === 'after') {
-        insertIndex++;
-      }
-
-      // 插入到新位置
-      list.splice(insertIndex, 0, dragged);
-
-      // 调整 colStart 使其紧邻目标
-      if (dropPos.type === 'before') {
-        // 放在目标左边
-        const targetStart = target.colStart ?? 1;
-        const targetSpan = target.colSpan ?? 1;
-        const draggedSpan = dragged.colSpan ?? 1;
-
-        // 重新分配空间：dragged + target 平分原有空间
-        const totalSpan = targetSpan;
-        const newDraggedSpan = Math.max(MIN_COL_SPAN, Math.floor(totalSpan / 2));
-        const newTargetSpan = Math.max(MIN_COL_SPAN, totalSpan - newDraggedSpan);
-
-        dragged.colStart = targetStart;
-        dragged.colSpan = newDraggedSpan;
-        dragged.colSpanLocked = true;
-
-        target.colStart = targetStart + newDraggedSpan;
-        target.colSpan = newTargetSpan;
-        target.colSpanLocked = true;
-      } else {
-        // 放在目标右边
-        const targetStart = target.colStart ?? 1;
-        const targetSpan = target.colSpan ?? 1;
-
-        // 重新分配空间
-        const totalSpan = targetSpan;
-        const newTargetSpan = Math.max(MIN_COL_SPAN, Math.floor(totalSpan / 2));
-        const newDraggedSpan = Math.max(MIN_COL_SPAN, totalSpan - newTargetSpan);
-
-        target.colSpan = newTargetSpan;
-        target.colSpanLocked = true;
-
-        dragged.colStart = targetStart + newTargetSpan;
-        dragged.colSpan = newDraggedSpan;
-        dragged.colSpanLocked = true;
-      }
-      break;
-    }
-
-    case 'row-start':
-    case 'row-end': {
-      // 移动到新行
-      dragged.colStart = 1;
-      dragged.colSpan = GRID_COLUMNS;
-      dragged.colSpanLocked = true;
-
-      // 重新排列到对应行
-      // 这里暂时让 vuedraggable 处理实际的数组移动
-      break;
-    }
-  }
-}
 
 watch(
   () => cellList.value.length,
@@ -800,16 +719,19 @@ watch(
 
 <template>
   <div
-    class="grid-container drag-handle"
+    class="grid-container"
     :class="{ selected: isSelected, hovered: isHovered }"
     @click.stop="uiStore.selectNode(node.id)"
     @mouseenter.stop="uiStore.hoverNode(node.id)"
     @mouseleave.stop="uiStore.hoverNode(null)"
   >
-    <div v-if="showActions" class="type-badge">
-      <span>Grid</span>
-      <NodeActions :node="node" :show="showActions" />
+    <!-- 顶部拖拽区域 + 标识 -->
+    <div class="row-header">
+      <span class="row-label">Row</span>
     </div>
+
+    <!-- 悬停时显示操作按钮 -->
+    <NodeActions v-if="showActions" :node="node" :show="showActions" class="row-actions" />
 
     <Draggable
       ref="gridCanvasRef"
@@ -819,7 +741,7 @@ watch(
       :animation="200"
       :fallback-on-body="true"
       :swap-threshold="0.65"
-      :filter="'.resize-handle'"
+      :filter="'.resize-handle, .cell-actions'"
       :prevent-on-filter="true"
       ghost-class="drag-ghost"
       chosen-class="drag-chosen"
@@ -879,6 +801,7 @@ watch(
   background: var(--bg-elevated);
   border-radius: 8px;
   padding: 8px;
+  padding-top: 0;
   transition: border-color 0.15s, box-shadow 0.15s;
 }
 
@@ -891,21 +814,46 @@ watch(
   box-shadow: 0 0 0 2px rgba(var(--accent-primary-rgb), 0.2);
 }
 
-.type-badge {
-  position: absolute;
-  bottom: -10px;
-  right: 8px;
+/* 顶部拖拽区域 - 用于拖动整个 Row */
+.row-header {
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 2px 8px;
-  background: var(--bg-elevated);
-  border: 2px solid var(--accent-primary);
-  border-radius: 4px;
+  justify-content: space-between;
+  padding: 6px 8px;
+  cursor: grab;
+  border-bottom: 1px solid var(--border-subtle);
+  margin-bottom: 8px;
+  border-radius: 6px 6px 0 0;
+  background: var(--bg-subtle);
+}
+
+.row-header:active {
+  cursor: grabbing;
+}
+
+.row-label {
   font-size: 10px;
   font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.grid-container.selected .row-header {
+  background: var(--accent-subtle);
+  border-bottom-color: var(--accent-primary);
+}
+
+.grid-container.selected .row-label {
   color: var(--accent-primary);
-  z-index: 1;
+}
+
+/* 操作按钮 - 悬停时显示在右上角 */
+.row-actions {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  z-index: 10;
 }
 
 .grid-container {
@@ -937,11 +885,21 @@ watch(
 
 .grid-canvas {
   min-height: 60px;
+  align-content: flex-start;
 }
 
 .grid-item-wrapper {
   display: block;
   min-width: 0;
+  flex: 0 0 calc(
+    (100% - (var(--grid-gap-col) * (var(--grid-columns) - 1))) / var(--grid-columns) * var(--grid-span)
+    + (var(--grid-gap-col) * (var(--grid-span) - 1))
+  );
+  max-width: calc(
+    (100% - (var(--grid-gap-col) * (var(--grid-columns) - 1))) / var(--grid-columns) * var(--grid-span)
+    + (var(--grid-gap-col) * (var(--grid-span) - 1))
+  );
+  box-sizing: border-box;
 }
 
 .drop-slot {

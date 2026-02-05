@@ -2,7 +2,7 @@
 import { computed, ref } from 'vue';
 import { usePagesStore, useUIStore } from '@/app/store';
 import TemplateLibraryPanel from './TemplateLibraryPanel.vue';
-import TemplateStructureView from './TemplateStructureView.vue';
+import GridLayoutView from './GridLayoutView.vue';
 import PropertyInspector from './PropertyInspector.vue';
 import PromptPreviewDock from './PromptPreviewDock.vue';
 import EditorToolbar from './EditorToolbar.vue';
@@ -127,7 +127,7 @@ function toggleLeftPanel() {
       
       <!-- Center (Structure View) -->
       <main class="editor-center">
-        <TemplateStructureView />
+        <GridLayoutView />
         
         <!-- Bottom Panel -->
         <div 

@@ -6,11 +6,11 @@ import {
   createMoveValidator
 } from '@/composables/useDragDrop';
 import { createBlockNode, getBlockMeta } from '@/domain/registry';
-import type { CardNode, FormNode, GridNode, LayoutNode, TabsNode } from '@/domain/schema';
+import type { CardNode, FormNode, GridCell, GridNode, LayoutNode, TabsNode } from '@/domain/schema';
 import { Copy, GripVertical, Plus, Trash2 } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
 import Draggable from 'vuedraggable';
-import { CardContainer, GridContainer, TabsContainer } from './containers';
+import { CardContainer, GridCellItem, GridContainer, TabsContainer } from './containers';
 
 const props = withDefaults(defineProps<{
   node: LayoutNode;
@@ -194,9 +194,24 @@ function deleteNode() {
       </template>
     </TabsContainer>
 
-    <!-- GridCell 和 Tab 由父组件专门处理，这里不渲染 -->
-    <template v-else-if="isGridCell || isTab">
-      <!-- 由 GridContainer/TabsContainer 内部渲染 -->
+    <!-- 特殊容器: GridCell（独立模式） -->
+    <GridCellItem
+      v-else-if="isGridCell"
+      :cell="(node as GridCell)"
+      :depth="depth"
+      :standalone="true"
+    >
+      <template #child="{ child, depth: childDepth }">
+        <TemplateStructureNode
+          :node="child"
+          :depth="childDepth"
+        />
+      </template>
+    </GridCellItem>
+
+    <!-- Tab 由父组件 TabsContainer 处理 -->
+    <template v-else-if="isTab">
+      <!-- 由 TabsContainer 内部渲染 -->
     </template>
 
     <!-- 通用节点卡片 -->

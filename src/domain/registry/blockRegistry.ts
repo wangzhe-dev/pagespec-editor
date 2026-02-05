@@ -83,10 +83,11 @@ blockRegistry.set('Grid', {
     gap: 12,
     justifyItems: 'stretch',
     alignItems: 'stretch',
-    // 默认包含两个 Cell，用户可通过复制按钮增加更多
+    // 默认包含三个 Cell，三等分布局
     children: [
-      { id: '__cell1__', type: 'GridCell', label: '左侧区域', colSpan: 12, rowSpan: 6, children: [] },
-      { id: '__cell2__', type: 'GridCell', label: '右侧区域', colSpan: 12, rowSpan: 6, children: [] },
+      { id: '__cell1__', type: 'GridCell', label: '左侧区域', colSpan: 8, rowSpan: 6, children: [] },
+      { id: '__cell2__', type: 'GridCell', label: '中间区域', colSpan: 8, rowSpan: 6, children: [] },
+      { id: '__cell3__', type: 'GridCell', label: '右侧区域', colSpan: 8, rowSpan: 6, children: [] },
     ],
   },
   propertySchema: [

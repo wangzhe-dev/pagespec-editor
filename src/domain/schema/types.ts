@@ -71,6 +71,9 @@ export const GridCellSchema = BaseNodeSchema.extend({
   colSpanLocked: z.boolean().default(false), // 是否锁定列宽
   rowStart: z.number().default(1),      // grid-row-start
   rowSpan: z.number().default(1),       // 占几行
+  // 独立尺寸（用于嵌套 cell，像素值）
+  width: z.number().optional(),         // 宽度 px
+  height: z.number().optional(),        // 高度 px
   // 对齐
   justifySelf: z.enum(['start', 'center', 'end', 'stretch']).optional(),
   alignSelf: z.enum(['start', 'center', 'end', 'stretch']).optional(),
