@@ -1,19 +1,19 @@
 <script setup lang="ts">
-import { ref } from 'vue';
 import { usePagesStore, useProfilesStore, useUIStore } from '@/app/store';
-import { 
-  FileJson, 
-  Download, 
-  Upload, 
-  Settings, 
-  Moon, 
-  Sun,
-  Copy,
-  Github,
-  HelpCircle,
-} from 'lucide-vue-next';
-import { downloadJSON, importJSON, copyToClipboard } from '@/utils';
 import { buildPrompt } from '@/domain/compiler';
+import { copyToClipboard, downloadJSON, importJSON } from '@/utils/index.ts';
+import {
+    Copy,
+    Download,
+    FileJson,
+    Github,
+    HelpCircle,
+    Moon,
+    Settings,
+    Sun,
+    Upload,
+} from 'lucide-vue-next';
+import { ref } from 'vue';
 
 const pagesStore = usePagesStore();
 const profilesStore = useProfilesStore();
@@ -44,7 +44,7 @@ async function handleFileImport(e: Event) {
   const input = e.target as HTMLInputElement;
   const file = input.files?.[0];
   if (!file) return;
-  
+
   try {
     const data = await importJSON(file);
     if (data.pages) {
@@ -54,22 +54,22 @@ async function handleFileImport(e: Event) {
   } catch (err) {
     uiStore.showToast('error', '导入失败：无效的 JSON 文件');
   }
-  
+
   input.value = '';
 }
 
 async function copyCurrentPrompt() {
   const page = pagesStore.activePage;
   const profile = profilesStore.activeProfile;
-  
+
   if (!page || !profile) {
     uiStore.showToast('warning', '请先选择页面和配置');
     return;
   }
-  
+
   const result = buildPrompt(page, profile, uiStore.promptStyle);
   const success = await copyToClipboard(result.mainPrompt);
-  
+
   if (success) {
     uiStore.showToast('success', `已复制到剪贴板 (约 ${result.tokenEstimate} tokens)`);
   } else {
@@ -87,9 +87,9 @@ async function copyCurrentPrompt() {
       </div>
       <span class="version">v0.1.0</span>
     </div>
-    
+
     <div class="toolbar-center">
-      <button 
+      <button
         class="toolbar-btn primary"
         @click="copyCurrentPrompt"
         :disabled="!pagesStore.activePage"
@@ -99,7 +99,7 @@ async function copyCurrentPrompt() {
         <span>复制 Prompt</span>
       </button>
     </div>
-    
+
     <div class="toolbar-right">
       <button class="toolbar-btn" @click="exportWorkspace" title="导出工作区">
         <Download :size="16" />
@@ -108,9 +108,9 @@ async function copyCurrentPrompt() {
         <Upload :size="16" />
       </button>
       <div class="toolbar-divider" />
-      <button 
-        class="toolbar-btn" 
-        @click="uiStore.togglePanel('profile')" 
+      <button
+        class="toolbar-btn"
+        @click="uiStore.togglePanel('profile')"
         title="项目配置"
         :class="{ active: uiStore.panelVisibility.profile }"
       >
@@ -121,9 +121,9 @@ async function copyCurrentPrompt() {
         <Sun v-else :size="16" />
       </button>
       <div class="toolbar-divider" />
-      <a 
-        class="toolbar-btn" 
-        href="https://github.com" 
+      <a
+        class="toolbar-btn"
+        href="https://github.com"
         target="_blank"
         title="GitHub"
       >
@@ -133,10 +133,10 @@ async function copyCurrentPrompt() {
         <HelpCircle :size="16" />
       </button>
     </div>
-    
-    <input 
+
+    <input
       ref="fileInput"
-      type="file" 
+      type="file"
       accept=".json"
       @change="handleFileImport"
       style="display: none"

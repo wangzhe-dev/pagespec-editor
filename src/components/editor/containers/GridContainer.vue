@@ -13,7 +13,8 @@ import {
 import {
   computeIndicatorPosition,
   useEdgeDrag,
-  type EdgeDirection
+  type EdgeDirection,
+  type DropPosition,
 } from '@/composables/useEdgeDrag';
 import { createBlockNode } from '@/domain/registry';
 import type { GridCell, GridNode, LayoutNode } from '@/domain/schema';
@@ -50,6 +51,17 @@ const GRID_COLUMNS = 24;
 const GRID_ROW_UNIT = 8;
 const MAX_ROW_SPAN = 60;
 const MIN_COL_SPAN = 3;
+const DEBUG_GRID_DROP = import.meta.env.DEV;
+
+interface DragSnapshot {
+  rowIds: string[][];
+  cellById: Map<string, GridCell>;
+  draggedId: string;
+  startedAt: number;
+}
+
+const dragSnapshot = ref<DragSnapshot | null>(null);
+const lastDragPoint = ref<{ x: number; y: number } | null>(null);
 
 // 获取子节点列表（可以是 GridCell 或其他组件）
 const cellList = computed<LayoutNode[]>(() => {
@@ -106,6 +118,40 @@ function splitRows(nodes: LayoutNode[]): LayoutNode[][] {
   }
 
   return rows;
+}
+
+function extractGridRows(nodes: LayoutNode[]): GridCell[][] {
+  return splitRows(nodes)
+    .map((row) => row.filter((node): node is GridCell => node.type === 'GridCell'))
+    .filter((row) => row.length > 0);
+}
+
+function rowIdsFromCells(rows: GridCell[][]): string[][] {
+  return rows.map((row) => row.map((cell) => cell.id));
+}
+
+function describeRows(rows: GridCell[][]): string {
+  if (rows.length === 0) return '(empty)';
+  return rows
+    .map((row, index) => {
+      const cells = row
+        .map((cell) => `${cell.label || cell.id}:${clamp(cell.colSpan ?? 1, 1, GRID_COLUMNS)}`)
+        .join(', ');
+      return `R${index + 1}[${cells}]`;
+    })
+    .join(' | ');
+}
+
+function debugGridDrop(message: string, payload: Record<string, unknown> = {}) {
+  if (!DEBUG_GRID_DROP) return;
+  let plainPayload: unknown = payload;
+  try {
+    plainPayload = JSON.parse(JSON.stringify(payload));
+  } catch {
+    plainPayload = payload;
+  }
+  // eslint-disable-next-line no-console
+  console.info(`[GridDrop] ${message}`, plainPayload);
 }
 
 function getGridItemStyle(node: LayoutNode) {
@@ -170,68 +216,7 @@ function findAdjacentCell(cell: GridCell, edge: 'left' | 'right'): GridCell | nu
   }) ?? null;
 }
 
-// 初始化 cell 的位置（colStart）和宽度（colSpan）
-function initializeCellPositions(cells: GridCell[], reason: 'init' | 'add' | 'drag' | 'resize' | 'structure') {
-  if (cells.length === 0) return;
-
-  // resize 时不重新分配位置
-  if (reason === 'resize') return;
-
-  // 检查是否所有 cell 都已有有效的 colSpan（说明是已配置好的 Grid）
-  const allHaveValidSpan = cells.every(cell =>
-    cell.colSpan != null && cell.colSpan >= 1
-  );
-
-  // 如果所有 cell 都已有有效 colSpan，只需要重新计算 colStart 位置
-  if (allHaveValidSpan && reason === 'structure') {
-    let nextStart = 1;
-    cells.forEach(cell => {
-      cell.colStart = nextStart;
-      nextStart += cell.colSpan ?? 1;
-    });
-    return;
-  }
-
-  // 检查是否所有 cell 都已有有效的 colStart（非新添加的情况）
-  const allHavePosition = cells.every(cell =>
-    cell.colStart != null && cell.colStart >= 1 && cell.colSpanLocked
-  );
-
-  // 如果所有 cell 都已有位置且这不是结构变化，保持现有位置
-  if (allHavePosition && reason !== 'add' && reason !== 'drag' && reason !== 'structure') {
-    return;
-  }
-
-  // 为新 cell 或需要初始化的 cell 分配位置
-  let nextStart = 1;
-  cells.forEach((cell, index) => {
-    // 如果是已锁定的 cell，使用其现有位置
-    if (reason !== 'drag' && cell.colSpanLocked && cell.colStart != null && cell.colStart >= 1) {
-      // 保持现有位置，但更新 nextStart
-      nextStart = cell.colStart + (cell.colSpan ?? 1);
-      return;
-    }
-
-    // 为未锁定的 cell 分配位置
-    cell.colStart = nextStart;
-
-    // 如果 cell 已有 colSpan，保留它
-    if (cell.colSpan != null && cell.colSpan >= 1) {
-      cell.colSpan = clamp(cell.colSpan, 1, GRID_COLUMNS - nextStart + 1);
-    } else {
-      // 计算默认宽度：平均分配剩余空间
-      const remainingCells = cells.length - index;
-      const remainingSpace = GRID_COLUMNS - nextStart + 1;
-      const defaultSpan = Math.max(1, Math.floor(remainingSpace / remainingCells));
-      cell.colSpan = clamp(defaultSpan, 1, GRID_COLUMNS - nextStart + 1);
-    }
-
-    cell.rowSpan = clamp(cell.rowSpan ?? 1, 1, MAX_ROW_SPAN);
-    nextStart = cell.colStart + cell.colSpan;
-  });
-}
-
-function normalizeRow(row: LayoutNode[], reason: 'init' | 'add' | 'drag' | 'resize' | 'structure') {
+function normalizeRow(row: LayoutNode[], _reason: 'init' | 'add' | 'drag' | 'resize' | 'structure') {
   if (row.length === 0) return;
 
   const gridCells = row.filter(node => node.type === 'GridCell') as GridCell[];
@@ -273,6 +258,7 @@ function ensureGridCellList() {
 let isNormalizing = false;
 function normalizeGridLayout(reason: 'init' | 'add' | 'drag' | 'resize' | 'structure') {
   if (isNormalizing) return;
+  if (reason === 'structure' && edgeDrag.isDragging.value) return;
   isNormalizing = true;
 
   try {
@@ -280,49 +266,188 @@ function normalizeGridLayout(reason: 'init' | 'add' | 'drag' | 'resize' | 'struc
       ensureGridCellList();
     }
 
-    // 拖拽/添加后：重新计算布局
-    // 策略：按顺序分行，每行最多放到填满 24 列，然后平分
-    if (reason === 'drag' || reason === 'add') {
-      const gridCells = cellList.value.filter(n => n.type === 'GridCell') as GridCell[];
-
-      // 计算每个 cell 最小需要多少列（至少 MIN_COL_SPAN）
-      const minSpan = MIN_COL_SPAN;
-      // 一行能放几个？
-      const maxPerRow = Math.floor(GRID_COLUMNS / minSpan);
-
-      // 按顺序分行：每行最多 maxPerRow 个
-      let rowStart = 0;
-      while (rowStart < gridCells.length) {
-        const rowEnd = Math.min(rowStart + maxPerRow, gridCells.length);
-        const rowCells = gridCells.slice(rowStart, rowEnd);
-
-        // 这一行有几个 cell，平分 24 列
-        const count = rowCells.length;
-        const spanPerCell = Math.floor(GRID_COLUMNS / count);
-        let nextStart = 1;
-
-        rowCells.forEach((cell, index) => {
-          cell.colStart = nextStart;
-          if (index === count - 1) {
-            cell.colSpan = GRID_COLUMNS - nextStart + 1;
-          } else {
-            cell.colSpan = spanPerCell;
-          }
-          cell.rowSpan = clamp(cell.rowSpan ?? 1, 1, MAX_ROW_SPAN);
-          nextStart += cell.colSpan;
-        });
-
-        rowStart = rowEnd;
-      }
-    } else {
-      // 其他情况：使用原来的 splitRows + normalizeRow 逻辑
-      const nodes = cellList.value;
-      const rows = splitRows(nodes);
-      rows.forEach(row => normalizeRow(row, reason));
-    }
+    const rows = splitRows(cellList.value);
+    rows.forEach(row => normalizeRow(row, reason));
   } finally {
     isNormalizing = false;
   }
+}
+
+function findTargetPosition(rowIds: string[][], targetId: string): { rowIndex: number; colIndex: number } | null {
+  for (let rowIndex = 0; rowIndex < rowIds.length; rowIndex++) {
+    const colIndex = rowIds[rowIndex].indexOf(targetId);
+    if (colIndex !== -1) {
+      return { rowIndex, colIndex };
+    }
+  }
+  return null;
+}
+
+function applyRowsByIds(rowIds: string[][], cellById: Map<string, GridCell>, reason: string): boolean {
+  const rows: GridCell[][] = rowIds
+    .map(ids => ids
+      .map(id => cellById.get(id))
+      .filter((cell): cell is GridCell => Boolean(cell)))
+    .filter(row => row.length > 0);
+
+  if (rows.length === 0) return false;
+
+  rows.forEach(row => normalizeRow(row as LayoutNode[], 'drag'));
+
+  const flattened = rows.flat();
+  const list = cellList.value;
+  list.splice(0, list.length, ...flattened);
+
+  debugGridDrop('rows-applied', {
+    reason,
+    rows: describeRows(rows),
+    order: flattened.map(cell => cell.id),
+  });
+
+  return true;
+}
+
+function removeDraggedFromRows(rowIds: string[][], draggedId: string): string[][] {
+  return rowIds
+    .map((row) => row.filter((id) => id !== draggedId))
+    .filter((row) => row.length > 0);
+}
+
+function detectInnerDropTargetId(
+  point: { x: number; y: number } | null,
+  draggedId: string
+): string | null {
+  if (!point) return null;
+
+  for (const [cellId, el] of cellElementsMap.value.entries()) {
+    if (cellId === draggedId) continue;
+    const contentEl = el.querySelector('.cell-content') as HTMLElement | null;
+    if (!contentEl) continue;
+    const rect = contentEl.getBoundingClientRect();
+    if (
+      point.x >= rect.left &&
+      point.x <= rect.right &&
+      point.y >= rect.top &&
+      point.y <= rect.bottom
+    ) {
+      return cellId;
+    }
+  }
+
+  return null;
+}
+
+function applyNestDrop(
+  draggedId: string,
+  targetId: string,
+  snapshot: DragSnapshot | null,
+): boolean {
+  const gridCells = cellList.value.filter((node): node is GridCell => node.type === 'GridCell');
+  const mergedCellById = new Map<string, GridCell>(snapshot?.cellById ?? []);
+  gridCells.forEach((cell) => mergedCellById.set(cell.id, cell));
+
+  const draggedCell = mergedCellById.get(draggedId);
+  const targetCell = mergedCellById.get(targetId);
+  if (!draggedCell || !targetCell || draggedId === targetId) return false;
+
+  const snapshotRows = snapshot?.rowIds;
+  const fallbackRows = rowIdsFromCells(extractGridRows(cellList.value));
+  const baseRows = snapshotRows?.length ? snapshotRows : fallbackRows;
+  const topLevelRows = removeDraggedFromRows(baseRows, draggedId);
+
+  if (topLevelRows.length > 0) {
+    if (!applyRowsByIds(topLevelRows, mergedCellById, `nest-top-level:${targetId}`)) {
+      return false;
+    }
+  } else {
+    cellList.value.splice(0, cellList.value.length);
+  }
+
+  if (!Array.isArray(targetCell.children)) {
+    targetCell.children = [];
+  }
+  if (!targetCell.children.some((node) => node.id === draggedId)) {
+    targetCell.children.push(draggedCell);
+  }
+
+  debugGridDrop('nest-drop-applied', {
+    draggedId,
+    targetId,
+    topRows: topLevelRows,
+    afterRows: describeRows(extractGridRows(cellList.value)),
+    targetChildren: targetCell.children.map((node) => `${node.type}:${node.id}`),
+  });
+
+  return true;
+}
+
+function applyDropPositionReorder(
+  draggedId: string,
+  dropPosition: DropPosition,
+  activeEdge: EdgeDirection,
+  snapshot: DragSnapshot | null,
+): boolean {
+  const gridCells = cellList.value.filter((node): node is GridCell => node.type === 'GridCell');
+  const mergedCellById = new Map<string, GridCell>(snapshot?.cellById ?? []);
+  gridCells.forEach(cell => mergedCellById.set(cell.id, cell));
+
+  const snapshotRows = snapshot?.rowIds;
+  const fallbackRows = rowIdsFromCells(extractGridRows(cellList.value));
+  const baseRows = snapshotRows?.length ? snapshotRows : fallbackRows;
+  const rowIds = baseRows.map(row => [...row]);
+
+  if (rowIds.length === 0) return false;
+
+  let sourceRowIndex = rowIds.findIndex(row => row.includes(draggedId));
+  if (sourceRowIndex === -1) {
+    if (!dropPosition) {
+      return applyRowsByIds(baseRows, mergedCellById, 'restore-no-source-row');
+    }
+    rowIds.push([draggedId]);
+    sourceRowIndex = rowIds.length - 1;
+  }
+
+  rowIds[sourceRowIndex] = rowIds[sourceRowIndex].filter(id => id !== draggedId);
+  const sourceRowRemoved = rowIds[sourceRowIndex].length === 0;
+  if (sourceRowRemoved) {
+    rowIds.splice(sourceRowIndex, 1);
+  }
+
+  if (!dropPosition) {
+    return applyRowsByIds(baseRows, mergedCellById, 'restore-no-drop-position');
+  }
+
+  if (dropPosition.type === 'before' || dropPosition.type === 'after') {
+    const target = findTargetPosition(rowIds, dropPosition.targetId);
+    if (!target) {
+      rowIds.push([draggedId]);
+    } else {
+      const insertIndex = target.colIndex + (dropPosition.type === 'after' ? 1 : 0);
+      rowIds[target.rowIndex].splice(insertIndex, 0, draggedId);
+    }
+  } else {
+    let insertRowIndex = dropPosition.type === 'row-start'
+      ? dropPosition.rowIndex
+      : dropPosition.rowIndex + 1;
+
+    if (sourceRowRemoved && sourceRowIndex < insertRowIndex) {
+      insertRowIndex -= 1;
+    }
+
+    insertRowIndex = clamp(insertRowIndex, 0, rowIds.length);
+    rowIds.splice(insertRowIndex, 0, [draggedId]);
+  }
+
+  debugGridDrop('drop-position-reorder', {
+    draggedId,
+    activeEdge,
+    dropPosition,
+    sourceRowIndex,
+    sourceRowRemoved,
+    rowIds,
+  });
+
+  return applyRowsByIds(rowIds, mergedCellById, `drop:${dropPosition.type}`);
 }
 
 // ============= Resize 状态管理 =============
@@ -648,10 +773,12 @@ function onGridMove(evt: any): boolean {
   if (!moveValidator(evt)) return false;
 
   const dragged = evt.draggedContext?.element as LayoutNode | undefined;
-  const related = evt.relatedContext?.element as LayoutNode | undefined;
-  if (!dragged || !related) return true;
+  if (!dragged) return true;
 
   const draggedRect = evt.draggedRect as DOMRect | undefined;
+  const isSameListSort = evt?.from === evt?.to;
+  const toEl = evt?.to as HTMLElement | undefined;
+  const isCellContentTarget = Boolean(toEl?.classList?.contains('cell-content'));
 
   // 更新边框感知拖拽状态
   if (edgeDrag.isDragging.value) {
@@ -665,14 +792,39 @@ function onGridMove(evt: any): boolean {
       clientY,
       draggedRect,
     } as any);
+    lastDragPoint.value = { x: clientX, y: clientY };
   }
 
-  if (dragged.type !== 'GridCell' || related.type !== 'GridCell') {
+  // GridCell 的拖拽策略：
+  // 1) 同列表重排：阻止 Sortable 默认行为，交给 onDragEnd + dropPosition
+  // 2) 跨列表：仅允许放入 GridCell 内部 .cell-content 列表
+  if (dragged.type === 'GridCell') {
+    if (isSameListSort) return false;
+    return isCellContentTarget;
+  }
+
+  const related = evt.relatedContext?.element as LayoutNode | undefined;
+  if (dragged.type !== 'GridCell' || related?.type !== 'GridCell') {
     return true;
+  }
+
+  const dropPosition = edgeDrag.dropPosition.value;
+  if (dropPosition?.type === 'row-start' || dropPosition?.type === 'row-end') {
+    // 行插入由 onDragEnd 使用 dropPosition 统一重排，阻止 Sortable 的默认排序
+    return false;
   }
 
   const relatedRect = evt.relatedRect as DOMRect | undefined;
   if (!draggedRect || !relatedRect) return true;
+
+  if (dropPosition?.type === 'before') {
+    evt.willInsertAfter = false;
+    return true;
+  }
+  if (dropPosition?.type === 'after') {
+    evt.willInsertAfter = true;
+    return true;
+  }
 
   // 根据边框感知的方向来决定插入位置
   const activeEdge = edgeDrag.activeEdge.value;
@@ -750,18 +902,123 @@ function onDragStart(evt: any) {
     clientY,
     draggedRect,
   } as any);
+  lastDragPoint.value = { x: clientX, y: clientY };
+
+  const rows = extractGridRows(cellList.value);
+  const allCells = rows.flat();
+  dragSnapshot.value = {
+    rowIds: rowIdsFromCells(rows),
+    cellById: new Map(allCells.map(cell => [cell.id, cell])),
+    draggedId: dragged.id,
+    startedAt: Date.now(),
+  };
+
+  debugGridDrop('drag-start', {
+    draggedId: dragged.id,
+    rows: describeRows(rows),
+    rowIds: dragSnapshot.value.rowIds,
+  });
 }
 
-function onDragEnd() {
-  // 清理边框感知拖拽状态
-  edgeDrag.onDragEnd();
-  // 重新计算布局（同一行的 cells 自动平分）
+function onNativeDragOver(event: DragEvent) {
+  if (!edgeDrag.isDragging.value) return;
+  if (typeof event.clientX !== 'number' || typeof event.clientY !== 'number') return;
+
+  // GridCell 的默认排序已被禁用，使用原生 dragover 持续更新边框感知拖拽状态
+  edgeDrag.onDragMove({
+    clientX: event.clientX,
+    clientY: event.clientY,
+  } as any);
+  lastDragPoint.value = { x: event.clientX, y: event.clientY };
+}
+
+function onDragEnd(evt: any) {
+  const snapshot = dragSnapshot.value;
+  const beforeRows = extractGridRows(cellList.value);
+  const dragResult = edgeDrag.onDragEnd();
+  const draggedId = dragResult.draggedId ?? snapshot?.draggedId ?? null;
+  const { dropPosition, activeEdge } = dragResult;
+  const isCrossContainerDrop = Boolean(evt?.from && evt?.to && evt.from !== evt.to);
+  const innerDropTargetId = draggedId ? detectInnerDropTargetId(lastDragPoint.value, draggedId) : null;
+
+  debugGridDrop('drag-end', {
+    draggedId,
+    activeEdge,
+    dropPosition,
+    beforeRows: describeRows(beforeRows),
+    snapshot: snapshot?.rowIds,
+    crossContainer: isCrossContainerDrop,
+    innerDropTargetId,
+    lastDragPoint: lastDragPoint.value,
+    sortable: {
+      oldIndex: evt?.oldIndex,
+      newIndex: evt?.newIndex,
+      pullMode: evt?.pullMode,
+    },
+  });
+
+  if (draggedId && innerDropTargetId && !dropPosition) {
+    const nested = applyNestDrop(draggedId, innerDropTargetId, snapshot);
+    if (nested) {
+      uiStore.selectNode(draggedId);
+      dragSnapshot.value = null;
+      lastDragPoint.value = null;
+      return;
+    }
+  }
+
+  // 跨容器拖拽（例如：GridCell 拖入某个 GridCell 内容区）交给 Sortable 默认迁移处理。
+  // 这里不要做 snapshot 恢复，否则会把已迁移的节点重新塞回顶层，导致“顶部和内部同时存在”。
+  if (isCrossContainerDrop) {
+    normalizeGridLayout('structure');
+    debugGridDrop('drag-end-cross-container', {
+      afterRows: describeRows(extractGridRows(cellList.value)),
+    });
+    dragSnapshot.value = null;
+    lastDragPoint.value = null;
+    return;
+  }
+
+  let applied = false;
+  if (draggedId) {
+    applied = applyDropPositionReorder(draggedId, dropPosition, activeEdge, snapshot);
+    if (applied) {
+      uiStore.selectNode(draggedId);
+    }
+  }
+
+  if (!applied) {
+    if (snapshot?.rowIds?.length) {
+      const mergedCellById = new Map<string, GridCell>(snapshot.cellById);
+      cellList.value
+        .filter((node): node is GridCell => node.type === 'GridCell')
+        .forEach(cell => mergedCellById.set(cell.id, cell));
+      applied = applyRowsByIds(snapshot.rowIds, mergedCellById, 'fallback-restore-snapshot');
+    }
+  }
+
+  if (!applied) {
+    normalizeGridLayout('drag');
+    debugGridDrop('drag-end-fallback-normalize', {
+      afterRows: describeRows(extractGridRows(cellList.value)),
+    });
+  } else {
+    debugGridDrop('drag-end-applied', {
+      afterRows: describeRows(extractGridRows(cellList.value)),
+    });
+  }
+
+  dragSnapshot.value = null;
+  lastDragPoint.value = null;
 }
 
 
 watch(
   () => cellList.value.length,
-  () => normalizeGridLayout('structure'),
+  () => {
+    if (edgeDrag.isDragging.value) return;
+    normalizeGridLayout('structure');
+  },
   { immediate: true }
 );
 </script>
@@ -794,6 +1051,7 @@ watch(
       :move="onGridMove"
       @add="onAddCell"
       @start="onDragStart"
+      @dragover="onNativeDragOver"
       @end="onDragEnd"
       class="grid-canvas"
       :style="gridStyle"

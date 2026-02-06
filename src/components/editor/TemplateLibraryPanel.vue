@@ -66,7 +66,8 @@ const templates: PageTemplate[] = [
 
 // 容器组件（可嵌套子组件）
 const containerBlocks = [
-  { type: 'Grid', label: '栅格布局', icon: LayoutGrid, description: '多行多列Grid布局' },
+  { type: 'Grid', label: 'Row 行容器', icon: LayoutGrid, description: '类似 el-row，内部放 Col' },
+  { type: 'GridCell', label: 'Col 列容器', icon: LayoutGrid, description: '类似 el-col，可继续嵌套 Row' },
   { type: 'Card', label: '卡片容器', icon: CreditCard, description: '带标题的卡片' },
   { type: 'Tabs', label: '标签页', icon: SquareStack, description: '多标签切换' },
 ];
@@ -123,8 +124,37 @@ function applyTemplate(template: PageTemplate) {
   }
 }
 
-// 使用公共的克隆函数
+function createDefaultRowNode(): LayoutNode {
+  const defaultCol = createBlockNode('GridCell', {
+    label: 'Col 1',
+    colSpan: 24,
+    children: [],
+  }) as LayoutNode;
+
+  return createBlockNode('Grid', {
+    label: 'Row',
+    columns: 24,
+    gap: 12,
+    children: [defaultCol],
+  }) as LayoutNode;
+}
+
+function createDefaultColNode(): LayoutNode {
+  return createBlockNode('GridCell', {
+    label: 'Col',
+    colSpan: 24,
+    children: [],
+  }) as LayoutNode;
+}
+
+// 使用公共克隆函数，并给 Row/Col 设置更轻量的默认结构
 function cloneBlock(item: { type: string }): LayoutNode {
+  if (item.type === 'Grid') {
+    return createDefaultRowNode();
+  }
+  if (item.type === 'GridCell') {
+    return createDefaultColNode();
+  }
   return clonePaletteBlock(item);
 }
 

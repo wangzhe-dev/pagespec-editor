@@ -8,6 +8,8 @@ import { useUIStore } from '@/app/store';
 import {
   createBlockDragGroup,
   createMoveValidator,
+  isDescendant,
+  resolveDraggedType,
 } from '@/composables/useDragDrop';
 import { createBlockNode } from '@/domain/registry';
 import type { GridCell, GridNode, LayoutNode } from '@/domain/schema';
@@ -168,16 +170,29 @@ const childrenList = computed<LayoutNode[]>(() => {
 // 拖拽组配置
 const blockDragGroup = computed(() => createBlockDragGroup());
 
-// 拖拽验证 - Cell 可以包含 Grid/Table/Form 等，但不能直接包含 GridCell
-const moveValidator = computed(() => {
+const baseMoveValidator = computed(() => {
   return createMoveValidator({
     containerNode: props.cell,
     containerType: 'GridCell',
     childrenList: childrenList.value,
-    // GridCell 只能放在 Grid 中，不能直接放在 Cell 中
-    disallowedChildTypes: ['GridCell'],
   });
 });
+
+// 拖拽验证：
+// - 常规组件继续走 registry 规则
+// - GridCell 特判放行（用于“cell 拖入 cell”），并防止循环嵌套
+function moveValidator(evt: any): boolean {
+  const childType = resolveDraggedType(evt.draggedContext?.element);
+  if (childType === 'GridCell') {
+    const dragged = evt.draggedContext?.element as LayoutNode | undefined;
+    if (dragged?.id && isDescendant(dragged, props.cell.id)) {
+      return false;
+    }
+    return true;
+  }
+
+  return baseMoveValidator.value(evt);
+}
 
 function setHover(edge: ResizeEdge) {
   if (props.standalone) {

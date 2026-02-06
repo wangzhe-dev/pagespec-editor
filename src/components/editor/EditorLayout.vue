@@ -1,17 +1,17 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
 import { usePagesStore, useUIStore } from '@/app/store';
-import TemplateLibraryPanel from './TemplateLibraryPanel.vue';
-import GridLayoutView from './GridLayoutView.vue';
-import PropertyInspector from './PropertyInspector.vue';
-import PromptPreviewDock from './PromptPreviewDock.vue';
-import EditorToolbar from './EditorToolbar.vue';
-import { 
+import {
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
-  ChevronDown,
   ChevronUp,
 } from 'lucide-vue-next';
+import { computed, ref } from 'vue';
+import EditorToolbar from './EditorToolbar.vue';
+// src/components/tool/build/index.vue
+import Tool from '@/components/tool/build/index.vue';
+import PromptPreviewDock from './PromptPreviewDock.vue';
+import PropertyInspector from './PropertyInspector.vue';
 
 const pagesStore = usePagesStore();
 const uiStore = useUIStore();
@@ -30,18 +30,18 @@ function startResizeLeft(e: MouseEvent) {
   isResizingLeft.value = true;
   const startX = e.clientX;
   const startWidth = uiStore.panelSizes.leftWidth;
-  
+
   const onMove = (e: MouseEvent) => {
     const diff = e.clientX - startX;
     uiStore.setPanelSize('left', Math.max(200, Math.min(500, startWidth + diff)));
   };
-  
+
   const onUp = () => {
     isResizingLeft.value = false;
     document.removeEventListener('mousemove', onMove);
     document.removeEventListener('mouseup', onUp);
   };
-  
+
   document.addEventListener('mousemove', onMove);
   document.addEventListener('mouseup', onUp);
 }
@@ -50,18 +50,18 @@ function startResizeRight(e: MouseEvent) {
   isResizingRight.value = true;
   const startX = e.clientX;
   const startWidth = uiStore.panelSizes.rightWidth;
-  
+
   const onMove = (e: MouseEvent) => {
     const diff = startX - e.clientX;
     uiStore.setPanelSize('right', Math.max(280, Math.min(500, startWidth + diff)));
   };
-  
+
   const onUp = () => {
     isResizingRight.value = false;
     document.removeEventListener('mousemove', onMove);
     document.removeEventListener('mouseup', onUp);
   };
-  
+
   document.addEventListener('mousemove', onMove);
   document.addEventListener('mouseup', onUp);
 }
@@ -70,18 +70,18 @@ function startResizeBottom(e: MouseEvent) {
   isResizingBottom.value = true;
   const startY = e.clientY;
   const startHeight = uiStore.panelSizes.bottomHeight;
-  
+
   const onMove = (e: MouseEvent) => {
     const diff = startY - e.clientY;
     uiStore.setPanelSize('bottom', Math.max(120, Math.min(500, startHeight + diff)));
   };
-  
+
   const onUp = () => {
     isResizingBottom.value = false;
     document.removeEventListener('mousemove', onMove);
     document.removeEventListener('mouseup', onUp);
   };
-  
+
   document.addEventListener('mousemove', onMove);
   document.addEventListener('mouseup', onUp);
 }
@@ -97,26 +97,26 @@ function toggleLeftPanel() {
   <div class="editor-layout" :class="{ 'resizing': isResizingLeft || isResizingRight || isResizingBottom }">
     <!-- Toolbar -->
     <EditorToolbar class="editor-toolbar" />
-    
+
     <!-- Main Content -->
     <div class="editor-main">
       <!-- Left Panel -->
-      <aside 
+      <aside
         v-if="leftPanelOpen"
         class="editor-left"
         :style="{ width: uiStore.panelSizes.leftWidth + 'px' }"
       >
-        <TemplateLibraryPanel class="panel-section flex-1" />
-        
+        <!-- <TemplateLibraryPanel class="panel-section flex-1" /> -->
+
         <!-- Left resize handle -->
-        <div 
+        <div
           class="resize-handle resize-handle-right"
           @mousedown="startResizeLeft"
         />
       </aside>
-      
+
       <!-- Left collapse button -->
-      <button 
+      <button
         class="panel-toggle panel-toggle-left"
         @click="toggleLeftPanel"
         :title="leftPanelOpen ? '收起左侧面板' : '展开左侧面板'"
@@ -124,27 +124,28 @@ function toggleLeftPanel() {
         <ChevronLeft v-if="leftPanelOpen" :size="16" />
         <ChevronRight v-else :size="16" />
       </button>
-      
+
       <!-- Center (Structure View) -->
       <main class="editor-center">
-        <GridLayoutView />
-        
+        <!-- <LayoutBuilder /> -->
+        <!-- Tool -->
+        <Tool />
         <!-- Bottom Panel -->
-        <div 
+        <div
           v-if="bottomPanelOpen && pagesStore.activePage"
           class="editor-bottom"
           :style="{ height: uiStore.panelSizes.bottomHeight + 'px' }"
         >
           <!-- Bottom resize handle -->
-          <div 
+          <div
             class="resize-handle resize-handle-top"
             @mousedown="startResizeBottom"
           />
           <PromptPreviewDock />
         </div>
-        
+
         <!-- Bottom toggle -->
-        <button 
+        <button
           v-if="pagesStore.activePage"
           class="panel-toggle panel-toggle-bottom"
           @click="uiStore.togglePanel('preview')"
@@ -155,23 +156,23 @@ function toggleLeftPanel() {
           <span>Prompt 预览</span>
         </button>
       </main>
-      
+
       <!-- Right Panel -->
-      <aside 
+      <aside
         v-if="rightPanelOpen"
         class="editor-right"
         :style="{ width: uiStore.panelSizes.rightWidth + 'px' }"
       >
         <!-- Right resize handle -->
-        <div 
+        <div
           class="resize-handle resize-handle-left"
           @mousedown="startResizeRight"
         />
         <PropertyInspector />
       </aside>
-      
+
       <!-- Right toggle -->
-      <button 
+      <button
         class="panel-toggle panel-toggle-right"
         @click="uiStore.togglePanel('properties')"
         :title="rightPanelOpen ? '收起属性面板' : '展开属性面板'"

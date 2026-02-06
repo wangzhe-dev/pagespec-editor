@@ -1,17 +1,16 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
 import { usePagesStore, useProfilesStore, useUIStore } from '@/app/store';
-import { buildPrompt, lint, type PromptResult, type LintResult } from '@/domain/compiler';
-import { copyToClipboard } from '@/utils';
-import { 
-  Copy, 
-  AlertTriangle, 
-  CheckCircle, 
-  Settings2,
+import { buildPrompt, lint, type LintResult, type PromptResult } from '@/domain/compiler';
+import { computed, ref } from 'vue';
+// import { copyToClipboard } from '@/utils';
+import {
+  AlertTriangle,
+  CheckCircle,
   Code,
   FileText,
   List,
-  Zap,
+  Settings2,
+  Zap
 } from 'lucide-vue-next';
 
 const pagesStore = usePagesStore();
@@ -36,23 +35,23 @@ const lintResult = computed<LintResult | null>(() => {
 });
 
 // Copy handlers
-async function copyPrompt() {
-  if (!promptResult.value) return;
-  const success = await copyToClipboard(promptResult.value.mainPrompt);
-  if (success) {
-    uiStore.showToast('success', `已复制 (约 ${promptResult.value.tokenEstimate} tokens)`);
-  } else {
-    uiStore.showToast('error', '复制失败');
-  }
-}
+// async function copyPrompt() {
+//   if (!promptResult.value) return;
+//   const success = await copyToClipboard(promptResult.value.mainPrompt);
+//   if (success) {
+//     uiStore.showToast('success', `已复制 (约 ${promptResult.value.tokenEstimate} tokens)`);
+//   } else {
+//     uiStore.showToast('error', '复制失败');
+//   }
+// }
 
-async function copyDSL() {
-  if (!promptResult.value) return;
-  const success = await copyToClipboard(promptResult.value.dsl);
-  if (success) {
-    uiStore.showToast('success', '已复制 DSL');
-  }
-}
+// async function copyDSL() {
+//   if (!promptResult.value) return;
+//   const success = await copyToClipboard(promptResult.value.dsl);
+//   if (success) {
+//     uiStore.showToast('success', '已复制 DSL');
+//   }
+// }
 
 // Style options
 function toggleStyleOption(key: keyof typeof uiStore.promptStyle) {
@@ -68,21 +67,21 @@ function toggleStyleOption(key: keyof typeof uiStore.promptStyle) {
     <!-- Tab bar -->
     <div class="dock-header">
       <div class="dock-tabs">
-        <button 
+        <button
           :class="{ active: activeTab === 'prompt' }"
           @click="activeTab = 'prompt'"
         >
           <FileText :size="14" />
           Prompt
         </button>
-        <button 
+        <button
           :class="{ active: activeTab === 'dsl' }"
           @click="activeTab = 'dsl'"
         >
           <Code :size="14" />
           DSL
         </button>
-        <button 
+        <button
           :class="{ active: activeTab === 'lint' }"
           @click="activeTab = 'lint'"
         >
@@ -96,18 +95,18 @@ function toggleStyleOption(key: keyof typeof uiStore.promptStyle) {
           </span>
         </button>
       </div>
-      
+
       <div class="dock-actions">
         <!-- Style toggles -->
         <div class="style-toggles">
-          <button 
+          <button
             :class="{ active: uiStore.promptStyle.skeletonMode }"
             @click="toggleStyleOption('skeletonMode')"
             title="骨架模式"
           >
             <Zap :size="12" />
           </button>
-          <button 
+          <button
             :class="{ active: uiStore.promptStyle.includeDeliverables }"
             @click="toggleStyleOption('includeDeliverables')"
             title="包含交付清单"
@@ -115,25 +114,25 @@ function toggleStyleOption(key: keyof typeof uiStore.promptStyle) {
             <List :size="12" />
           </button>
         </div>
-        
-        <button 
+
+        <!-- <button
           class="copy-btn"
           @click="activeTab === 'dsl' ? copyDSL() : copyPrompt()"
           :disabled="!promptResult"
         >
           <Copy :size="14" />
           复制
-        </button>
+        </button> -->
       </div>
     </div>
-    
+
     <!-- Content -->
     <div class="dock-content">
       <!-- No page selected -->
       <div v-if="!activePage" class="empty-state">
         <p>请先选择一个页面</p>
       </div>
-      
+
       <!-- No profile -->
       <div v-else-if="!activeProfile" class="empty-state">
         <Settings2 :size="24" />
@@ -142,7 +141,7 @@ function toggleStyleOption(key: keyof typeof uiStore.promptStyle) {
           打开项目配置
         </button>
       </div>
-      
+
       <!-- Prompt tab -->
       <div v-else-if="activeTab === 'prompt'" class="content-area">
         <div class="prompt-meta">
@@ -161,19 +160,19 @@ function toggleStyleOption(key: keyof typeof uiStore.promptStyle) {
         </div>
         <pre class="prompt-text">{{ promptResult?.mainPrompt }}</pre>
       </div>
-      
+
       <!-- DSL tab -->
       <div v-else-if="activeTab === 'dsl'" class="content-area">
         <pre class="dsl-text">{{ promptResult?.dsl }}</pre>
       </div>
-      
+
       <!-- Lint tab -->
       <div v-else-if="activeTab === 'lint'" class="content-area">
         <div v-if="lintResult && lintResult.issues.length === 0" class="lint-success">
           <CheckCircle :size="32" class="success-icon" />
           <p>检查通过，无问题</p>
         </div>
-        
+
         <div v-else-if="lintResult" class="lint-issues">
           <div class="lint-summary">
             <span v-if="lintResult.errorCount" class="error">
@@ -186,9 +185,9 @@ function toggleStyleOption(key: keyof typeof uiStore.promptStyle) {
               {{ lintResult.infoCount }} 个提示
             </span>
           </div>
-          
-          <div 
-            v-for="issue in lintResult.issues" 
+
+          <div
+            v-for="issue in lintResult.issues"
             :key="issue.code + issue.path"
             class="lint-issue"
             :class="issue.severity"

@@ -32,7 +32,7 @@ src/
 - **BlockRegistry**: Block 元数据注册表
   - 新增 Block 只需在此注册，无需修改 UI
   - 自动生成属性面板、图标、默认值
-  
+
 - **RecipeRegistry**: 联动配方注册表
   - 预定义常见联动模式（TreeSelectRefresh、MasterDetailLoad 等）
   - 可扩展自定义联动

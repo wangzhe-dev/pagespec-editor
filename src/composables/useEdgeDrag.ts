@@ -135,33 +135,33 @@ export function detectDropZone(
     samRowCells.sort((a, b) => a.rect.left - b.rect.left);
 
     if (edge === 'left') {
-      // 向左拖动，检测左边框位置
+      // 向左拖动：左边框进入目标内部，优先认为要放到目标前面
       for (const cell of samRowCells) {
         const { rect } = cell;
 
-        // 左边框在 cell 内部 → 插入到这个 cell 的后面
+        // 左边框在 cell 内部 → 插入到这个 cell 前面
         if (edgePosition >= rect.left && edgePosition <= rect.right) {
-          return { type: 'after', targetId: cell.id };
+          return { type: 'before', targetId: cell.id };
         }
 
-        // 左边框在 cell 的左边（超出了这个 cell）→ 插入到这个 cell 前面
+        // 左边框在 cell 左侧 → 插入到这个 cell 前面
         if (edgePosition < rect.left) {
           return { type: 'before', targetId: cell.id };
         }
       }
     } else {
-      // 向右拖动，检测右边框位置
+      // 向右拖动：右边框进入目标内部，优先认为要放到目标后面
       // 从右往左遍历
       for (let i = samRowCells.length - 1; i >= 0; i--) {
         const cell = samRowCells[i];
         const { rect } = cell;
 
-        // 右边框在 cell 内部 → 插入到这个 cell 的前面
+        // 右边框在 cell 内部 → 插入到这个 cell 后面
         if (edgePosition >= rect.left && edgePosition <= rect.right) {
-          return { type: 'before', targetId: cell.id };
+          return { type: 'after', targetId: cell.id };
         }
 
-        // 右边框在 cell 的右边（超出了这个 cell）→ 插入到这个 cell 后面
+        // 右边框在 cell 右侧 → 插入到这个 cell 后面
         if (edgePosition > rect.right) {
           return { type: 'after', targetId: cell.id };
         }
