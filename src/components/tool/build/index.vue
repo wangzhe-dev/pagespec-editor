@@ -60,6 +60,9 @@ import {
 } from "./utils/config.ts";
 
 type FormId = string | number;
+const GRID_SPAN_MIN = 3;
+const GRID_SPAN_MAX = 24;
+const GRID_SPAN_STEP = 3;
 
 
 
@@ -87,6 +90,14 @@ interface CanvasNode {
 let oldActiveId: FormId | undefined;
 let tempActiveData: CanvasNode | undefined;
 let oldBodyOnDrop: ((this: GlobalEventHandlers, ev: DragEvent) => unknown) | null = null;
+
+function normalizeGridSpan(span: unknown): number {
+  const raw = Number(span ?? GRID_SPAN_MAX);
+  if (!Number.isFinite(raw)) return GRID_SPAN_MAX;
+  const clamped = Math.min(GRID_SPAN_MAX, Math.max(GRID_SPAN_MIN, raw));
+  const snapped = Math.round(clamped / GRID_SPAN_STEP) * GRID_SPAN_STEP;
+  return Math.min(GRID_SPAN_MAX, Math.max(GRID_SPAN_MIN, snapped));
+}
 
 export default defineComponent({
   components: {
@@ -163,7 +174,7 @@ export default defineComponent({
         oneOf: "gridCol",
         tagIcon: "component",
         label: "GridCol",
-        basis: "basis-1/2",
+        span: 12,
         componentName: `col${randomString(8)}`,
         children: [],
       };
@@ -189,7 +200,7 @@ export default defineComponent({
     cloneComponent(this: any, origin: CanvasNode): CanvasNode {
       const clone = JSON.parse(JSON.stringify(origin)) as CanvasNode;
       clone.formId = randomString(8);
-      clone.span = formConf.span;
+      clone.span = typeof clone.span === "number" ? clone.span : formConf.span;
       clone.renderKey = Date.now(); // 改变renderKey后可以实现强制更新组件
       tempActiveData = clone;
 
@@ -244,7 +255,7 @@ export default defineComponent({
         tempActiveData = clone;
       } else if (clone.layout === "gridCol") {
         clone.componentName = `col${randomString(8)}`;
-        clone.basis = typeof clone.basis === "string" ? clone.basis : "basis-1/2";
+        clone.span = normalizeGridSpan(clone.span);
         if (!Array.isArray(clone.children)) {
           clone.children = [];
         }
@@ -289,7 +300,7 @@ export default defineComponent({
         item.componentName = `row${randomString(8)}`;
       } else if (item.layout === "gridCol") {
         item.componentName = `col${randomString(8)}`;
-        item.basis = typeof item.basis === "string" ? item.basis : "basis-1/2";
+        item.span = normalizeGridSpan(item.span);
       } else if (item.layout === "card") {
         item.vModel = `field${randomString(8)}`;
       } else if (item.layout === "subTable") {
@@ -811,6 +822,7 @@ $lighterBlue: #409eff;
 
 .grid-row-item {
   padding-top: 20px;
+  position: relative;
 
   .grid-row-wrapper {
     display: flex;
@@ -818,18 +830,69 @@ $lighterBlue: #409eff;
     gap: 8px;
     align-items: stretch;
     min-height: 120px;
+    height: 100%;
   }
 }
 
 .grid-col-item {
-  min-width: 160px;
-  flex-shrink: 0;
+  min-width: 0;
   padding-top: 20px;
+  position: relative;
 
   .grid-col-wrapper {
     min-height: 90px;
     width: 100%;
+    height: 100%;
   }
+}
+
+.node-resize-handle {
+  position: absolute;
+  z-index: 4;
+  background: transparent;
+  opacity: 0;
+  transition: opacity 0.15s ease, background 0.15s ease;
+
+  &:hover {
+    background: rgba(64, 158, 255, 0.28);
+  }
+}
+
+.drawing-row-item:hover>.node-resize-handle,
+.active-from-item>.node-resize-handle {
+  opacity: 1;
+}
+
+.node-resize-handle-left,
+.node-resize-handle-right {
+  top: 8px;
+  bottom: 8px;
+  width: 6px;
+  cursor: ew-resize;
+}
+
+.node-resize-handle-left {
+  left: -3px;
+}
+
+.node-resize-handle-right {
+  right: -3px;
+}
+
+.node-resize-handle-top,
+.node-resize-handle-bottom {
+  left: 8px;
+  right: 8px;
+  height: 6px;
+  cursor: ns-resize;
+}
+
+.node-resize-handle-top {
+  top: -3px;
+}
+
+.node-resize-handle-bottom {
+  bottom: -3px;
 }
 
 .drawing-item,

@@ -182,6 +182,7 @@ interface LayoutComponentConfig {
   defaultValue?: unknown[];
   children?: Record<string, unknown>[];
   basis?: string;
+  span?: number;
 }
 
 type TriggerType = "blur" | "change";
@@ -821,7 +822,7 @@ export const layoutComponents: LayoutComponentConfig[] = [
         oneOf: "gridCol",
         tagIcon: "component",
         label: "GridCol",
-        basis: "basis-1/2",
+        span: 12,
         children: [],
       },
     ],
@@ -834,7 +835,7 @@ export const layoutComponents: LayoutComponentConfig[] = [
     tagIcon: "component",
     label: "GridCol",
     changeTag: false,
-    basis: "basis-1/2",
+    span: 12,
     children: [],
   },
   // {
