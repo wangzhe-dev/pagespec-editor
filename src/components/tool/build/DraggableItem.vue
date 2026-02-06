@@ -5,15 +5,26 @@ import { defineComponent, type PropType } from 'vue'
 import draggable from 'vuedraggable'
 import Render from './utils/render'
 
-interface FormElement {
+type LayoutKind =
+  | 'colFormItem'
+  | 'rowFormItem'
+  | 'card'
+  | 'text'
+  | 'fgx'
+  | 'subTable'
+  | 'gridRow'
+  | 'gridCol'
+
+interface BaseCanvasNode {
   formId?: string | number
   renderKey?: string | number
-  layout?: string
+  layout?: LayoutKind | string
+  basis?: string
   span?: number
   label?: string
   labelWidth?: number | null
   required?: boolean
-  defaultValue?: any
+  defaultValue?: unknown
   tag?: string
   tagIcon?: string
   type?: string
@@ -21,17 +32,30 @@ interface FormElement {
   align?: string
   gutter?: number
   componentName?: string
-  children?: FormElement[]
+  children?: CanvasNode[]
   oneOf?: string
   isHeader?: boolean
   leftTitle?: string
   rightBtn?: boolean
-  [key: string]: any
+  [key: string]: unknown
 }
+
+interface GridRowNode extends BaseCanvasNode {
+  layout: 'gridRow'
+  children: CanvasNode[]
+}
+
+interface GridColNode extends BaseCanvasNode {
+  layout: 'gridCol'
+  basis?: string
+  children: CanvasNode[]
+}
+
+type CanvasNode = BaseCanvasNode | GridRowNode | GridColNode
 
 interface FormConf {
   unFocusedComponentBorder?: boolean
-  [key: string]: any
+  [key: string]: unknown
 }
 
 export default defineComponent({
@@ -39,7 +63,7 @@ export default defineComponent({
   components: { Render, draggable },
   props: {
     element: {
-      type: Object as PropType<FormElement>,
+      type: Object as PropType<CanvasNode>,
       required: true,
     },
     index: {
@@ -47,7 +71,7 @@ export default defineComponent({
       required: true,
     },
     drawingList: {
-      type: Array as PropType<FormElement[]>,
+      type: Array as PropType<CanvasNode[]>,
       required: true,
     },
     activeId: {
@@ -61,8 +85,11 @@ export default defineComponent({
   },
   emits: ['activeItem', 'copyItem', 'deleteItem'],
   setup(props, { emit }) {
+    const getChildren = (node: CanvasNode): CanvasNode[] =>
+      Array.isArray(node.children) ? node.children : []
+
     // ===== 操作按钮 =====
-    const itemBtns = (element: FormElement, index: number, parent: FormElement[]) => {
+    const itemBtns = (element: CanvasNode, index: number, parent: CanvasNode[]) => {
       return [
         <span
           class="drawing-item-copy"
@@ -87,23 +114,29 @@ export default defineComponent({
       ]
     }
 
-    // ===== 递归渲染子节点 =====
-    function renderChildren(element: FormElement): any {
-      if (!Array.isArray(element.children)) return null
-      return element.children.map((el: FormElement, i: number) => {
-        const layoutFn = el.layout ? layouts[el.layout] : undefined
-        if (layoutFn && element.oneOf === 'subTable') {
-          el.span = 4
-          return layoutFn(el, i, element.children!)
-        } else if (layoutFn) {
-          return layoutFn(el, i, element.children!)
-        }
-        throw new Error(`没有与${el.layout}匹配的layout`)
-      })
+    function renderDraggableChildren(parentElement: CanvasNode, className: string): any {
+      const children = getChildren(parentElement)
+      return (
+        <draggable
+          list={children}
+          animation={340}
+          group="componentsGroup"
+          class={className}
+          item-key="formId"
+        >
+          {{
+            item: ({ element: el, index: i }: { element: CanvasNode; index: number }) => {
+              const layoutFn = el.layout ? layouts[el.layout] : undefined
+              if (layoutFn) return layoutFn(el, i, children)
+              throw new Error(`没有与${el.layout}匹配的layout`)
+            },
+          }}
+        </draggable>
+      )
     }
 
     // ===== 各类布局渲染器 =====
-    const layouts: Record<string, (element: FormElement, index: number, parent: FormElement[]) => any> = {
+    const layouts: Record<string, (element: CanvasNode, index: number, parent: CanvasNode[]) => any> = {
       colFormItem(element, index, parent) {
         let className =
           props.activeId === element.formId
@@ -122,11 +155,13 @@ export default defineComponent({
               event.stopPropagation()
             }}
           >
-            <el-form-item
-              label-width={element.labelWidth ? `${element.labelWidth}px` : undefined}
-              label={element.label}
-              required={element.required}
-            >
+            <div class="field-content">
+              {element.label ? (
+                <div class="field-label">
+                  {element.required ? '* ' : ''}
+                  {element.label}
+                </div>
+              ) : null}
               <Render
                 key={element.renderKey}
                 conf={element}
@@ -136,7 +171,7 @@ export default defineComponent({
                   },
                 }}
               />
-            </el-form-item>
+            </div>
             {itemBtns(element, index, parent)}
           </el-col>
         )
@@ -148,19 +183,6 @@ export default defineComponent({
             ? 'drawing-row-item active-from-item'
             : 'drawing-row-item'
 
-        let child = renderChildren(element)
-        if (element.type === 'flex') {
-          child = (
-            <el-row
-              type={element.type}
-              justify={element.justify}
-              align={element.align}
-            >
-              {child}
-            </el-row>
-          )
-        }
-
         return (
           <el-col span={element.span}>
             <el-row
@@ -171,24 +193,52 @@ export default defineComponent({
                 event.stopPropagation()
               }}
             >
-              <draggable
-                list={element.children}
-                animation={340}
-                group="componentsGroup"
-                class="drag-wrapper"
-                item-key="formId"
-              >
-                {{
-                  item: ({ element: el, index: i }: { element: FormElement; index: number }) => {
-                    const layoutFn = el.layout ? layouts[el.layout] : undefined
-                    if (layoutFn) return layoutFn(el, i, element.children!)
-                    throw new Error(`没有与${el.layout}匹配的layout`)
-                  },
-                }}
-              </draggable>
+              {renderDraggableChildren(element, 'drag-wrapper')}
               {itemBtns(element, index, parent)}
             </el-row>
           </el-col>
+        )
+      },
+
+      gridRow(element, index, parent) {
+        const className =
+          props.activeId === element.formId
+            ? 'drawing-row-item grid-row-item active-from-item'
+            : 'drawing-row-item grid-row-item'
+
+        return (
+          <div
+            class={className}
+            onClick={(event: MouseEvent) => {
+              emit('activeItem', element)
+              event.stopPropagation()
+            }}
+          >
+            <span class="component-name">{element.label || 'GridRow'}</span>
+            {renderDraggableChildren(element, 'drag-wrapper grid-row-wrapper')}
+            {itemBtns(element, index, parent)}
+          </div>
+        )
+      },
+
+      gridCol(element, index, parent) {
+        const className =
+          props.activeId === element.formId
+            ? `drawing-row-item grid-col-item ${element.basis || 'basis-1/2'} active-from-item`
+            : `drawing-row-item grid-col-item ${element.basis || 'basis-1/2'}`
+
+        return (
+          <div
+            class={className}
+            onClick={(event: MouseEvent) => {
+              emit('activeItem', element)
+              event.stopPropagation()
+            }}
+          >
+            <span class="component-name">{element.label || 'GridCol'}</span>
+            {renderDraggableChildren(element, 'drag-wrapper grid-col-wrapper')}
+            {itemBtns(element, index, parent)}
+          </div>
         )
       },
 
@@ -217,21 +267,7 @@ export default defineComponent({
                     )
                   : undefined,
                 default: () => (
-                  <draggable
-                    list={element.children}
-                    animation={340}
-                    group="componentsGroup"
-                    class="drag-card-wrapper"
-                    item-key="formId"
-                  >
-                    {{
-                      item: ({ element: el, index: i }: { element: FormElement; index: number }) => {
-                        const layoutFn = el.layout ? layouts[el.layout] : undefined
-                        if (layoutFn) return layoutFn(el, i, element.children!)
-                        throw new Error(`没有与${el.layout}匹配的layout`)
-                      },
-                    }}
-                  </draggable>
+                  renderDraggableChildren(element, 'drag-card-wrapper')
                 ),
               }}
             </el-card>
@@ -258,7 +294,7 @@ export default defineComponent({
               event.stopPropagation()
             }}
           >
-            <el-form-item>
+            <div class="field-content">
               <Render
                 key={element.renderKey}
                 conf={element}
@@ -268,7 +304,7 @@ export default defineComponent({
                   },
                 }}
               />
-            </el-form-item>
+            </div>
             {itemBtns(element, index, parent)}
           </el-col>
         )
@@ -315,13 +351,15 @@ export default defineComponent({
             }}
             class={className}
           >
-            <el-form-item
-              label-width={element.labelWidth ? `${element.labelWidth}px` : undefined}
-              label={element.label}
-              required={element.required}
-            >
+            <div class="field-content">
+              {element.label ? (
+                <div class="field-label">
+                  {element.required ? '* ' : ''}
+                  {element.label}
+                </div>
+              ) : null}
               <c-gener-table widget={element} />
-            </el-form-item>
+            </div>
             {itemBtns(element, index, parent)}
           </el-col>
         )

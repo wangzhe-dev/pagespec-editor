@@ -4,52 +4,6 @@
       <el-scrollbar class="left-scrollbar">
         <div class="components-list">
           <div class="components-title">
-            <svg-icon icon-class="component" />输入型组件
-          </div>
-          <draggable class="components-draggable" :list="inputComponents"
-            :group="{ name: 'componentsGroup', pull: 'clone', put: false }" :clone="cloneComponent"
-            draggable=".components-item" :sort="false" item-key="label" @end="onEnd">
-            <template #item="{ element }">
-              <div class="components-item" @click="addComponent(element)">
-                <div class="components-body">
-                  <svg-icon :icon-class="element.tagIcon" />
-                  {{ element.label }}
-                </div>
-              </div>
-            </template>
-          </draggable>
-          <div class="components-title">
-            <svg-icon icon-class="component" />选择型组件
-          </div>
-          <draggable class="components-draggable" :list="selectComponents"
-            :group="{ name: 'componentsGroup', pull: 'clone', put: false }" :clone="cloneComponent"
-            draggable=".components-item" :sort="false" item-key="label" @end="onEnd">
-            <template #item="{ element }">
-              <div class="components-item" @click="addComponent(element)">
-                <div class="components-body">
-                  <svg-icon :icon-class="element.tagIcon" />
-                  {{ element.label }}
-                </div>
-              </div>
-            </template>
-          </draggable>
-
-          <div class="components-title">
-            <svg-icon icon-class="component" /> 模版型组件
-          </div>
-          <draggable class="components-draggable" :list="layoutTempComponents"
-            :group="{ name: 'componentsGroup', pull: 'clone', put: false }" :clone="cloneComponent"
-            draggable=".components-item" :sort="false" item-key="label" @end="onEnd">
-            <template #item="{ element }">
-              <div class="components-item" @click="addComponent(element)">
-                <div class="components-body">
-                  <svg-icon :icon-class="element.tagIcon" />
-                  {{ element.label }}
-                </div>
-              </div>
-            </template>
-          </draggable>
-          <div class="components-title">
             <svg-icon icon-class="component" /> 布局型组件
           </div>
           <draggable class="components-draggable" :list="layoutComponents"
@@ -72,8 +26,7 @@
       <div class="center-scrollbar">
         <div class="center-board-container">
           <div class="center-board-row">
-            <el-form :size="formConf.size" :label-position="formConf.labelPosition" :disabled="formConf.disabled"
-              :label-width="formConf.labelWidth + 'px'" class="center-board-row-list">
+            <div class="center-board-row-list flex flex-row">
               <draggable class="drawing-board" :list="drawingList" :animation="340" group="componentsGroup"
                 item-key="formId">
                 <template #item="{ element, index }">
@@ -85,7 +38,7 @@
               <div v-show="!drawingList.length" class="empty-info">
                 从左侧拖入或点选组件进行表单设计
               </div>
-            </el-form>
+            </div>
           </div>
         </div>
       </div>
@@ -94,6 +47,10 @@
 </template>
 
 <script lang="ts">
+import { randomString, titleCase } from "@/utils/index.ts";
+import { defineComponent, nextTick } from "vue";
+import draggable from "vuedraggable";
+import DraggableItem from "./DraggableItem.vue";
 import {
   formConf,
   inputComponents,
@@ -101,20 +58,17 @@ import {
   layoutTempComponents,
   selectComponents,
 } from "./utils/config.ts";
-import { defineComponent, nextTick } from "vue";
-import { randomString, titleCase } from "@/utils/index.ts";
-import draggable from "vuedraggable";
-import DraggableItem from "./DraggableItem.vue";
 
 type FormId = string | number;
 
 
 
-interface BuildItem {
+interface CanvasNode {
   formId?: FormId;
   renderKey?: string | number;
   layout?: string;
   oneOf?: string;
+  basis?: string;
   tempComponents?: boolean;
   tag?: string;
   tagIcon?: string;
@@ -126,12 +80,12 @@ interface BuildItem {
   dictCode?: string;
   options?: unknown[];
   span?: number;
-  children?: BuildItem[];
+  children?: CanvasNode[];
   [key: string]: unknown;
 }
 
 let oldActiveId: FormId | undefined;
-let tempActiveData: BuildItem | undefined;
+let tempActiveData: CanvasNode | undefined;
 let oldBodyOnDrop: ((this: GlobalEventHandlers, ev: DragEvent) => unknown) | null = null;
 
 export default defineComponent({
@@ -148,7 +102,7 @@ export default defineComponent({
       layoutComponents,
       layoutTempComponents,
       labelWidth: 100,
-      drawingList: [] as BuildItem[],
+      drawingList: [] as CanvasNode[],
       drawingData: {} as Record<string, unknown>,
       activeId: 1 as FormId,
       drawerVisible: false,
@@ -156,12 +110,12 @@ export default defineComponent({
       dialogVisible: false,
       generateConf: null as unknown,
       showFileName: false,
-      activeData: {} as BuildItem,
+      activeData: {} as CanvasNode,
       pageTypes: "create",
       jsonTemplate: {} as Record<string, unknown>,
       dictChild: null,
       dragging: false,
-      draggedControl: {} as BuildItem,
+      draggedControl: {} as CanvasNode,
     };
   },
   created() {
@@ -177,7 +131,7 @@ export default defineComponent({
   },
   watch: {
     "activeData.label": function (
-      this: { activeData: BuildItem; activeId: FormId },
+      this: { activeData: CanvasNode; activeId: FormId },
       val: string | undefined,
       oldVal: string | undefined
     ) {
@@ -201,12 +155,25 @@ export default defineComponent({
     },
   },
   methods: {
-    activeFormItem(this: { activeData: BuildItem; activeId: FormId }, element: BuildItem) {
+    buildDefaultGridCol(this: any): CanvasNode {
+      return {
+        formId: randomString(8),
+        renderKey: Date.now(),
+        layout: "gridCol",
+        oneOf: "gridCol",
+        tagIcon: "component",
+        label: "GridCol",
+        basis: "basis-1/2",
+        componentName: `col${randomString(8)}`,
+        children: [],
+      };
+    },
+    activeFormItem(this: { activeData: CanvasNode; activeId: FormId }, element: CanvasNode) {
       this.activeData = element;
       this.activeId = element.formId ?? randomString(8);
     },
     onEnd(
-      this: { activeData: BuildItem; activeId: FormId },
+      this: { activeData: CanvasNode; activeId: FormId },
       obj: { from: unknown; to: unknown }
     ) {
       if (obj.from !== obj.to) {
@@ -214,16 +181,17 @@ export default defineComponent({
         this.activeId = randomString(8);
       }
     },
-    addComponent(this: any, item: BuildItem) {
+    addComponent(this: any, item: CanvasNode) {
       const clone = this.cloneComponent(item);
       this.drawingList.push(clone);
       this.activeFormItem(clone);
     },
-    cloneComponent(this: any, origin: BuildItem): BuildItem {
-      const clone = JSON.parse(JSON.stringify(origin)) as BuildItem;
+    cloneComponent(this: any, origin: CanvasNode): CanvasNode {
+      const clone = JSON.parse(JSON.stringify(origin)) as CanvasNode;
       clone.formId = randomString(8);
       clone.span = formConf.span;
       clone.renderKey = Date.now(); // 改变renderKey后可以实现强制更新组件
+      tempActiveData = clone;
 
       if (!clone.layout) clone.layout = "colFormItem";
       if (clone.layout === "colFormItem") {
@@ -264,6 +232,23 @@ export default defineComponent({
         clone.componentName = `row${randomString(8)}`;
         clone.gutter = this.formConf.gutter;
         tempActiveData = clone;
+      } else if (clone.layout === "gridRow") {
+        clone.componentName = `row${randomString(8)}`;
+        if (!Array.isArray(clone.children) || !clone.children.length) {
+          clone.children = [this.buildDefaultGridCol()];
+        } else {
+          clone.children = clone.children.map((child: CanvasNode) =>
+            this.createIdAndKey(child)
+          );
+        }
+        tempActiveData = clone;
+      } else if (clone.layout === "gridCol") {
+        clone.componentName = `col${randomString(8)}`;
+        clone.basis = typeof clone.basis === "string" ? clone.basis : "basis-1/2";
+        if (!Array.isArray(clone.children)) {
+          clone.children = [];
+        }
+        tempActiveData = clone;
       }
       return tempActiveData ?? clone;
     },
@@ -287,19 +272,24 @@ export default defineComponent({
       this.drawerVisible = true;
     },
 
-    drawingItemCopy(this: any, item: BuildItem, parent: BuildItem[]) {
-      let clone = JSON.parse(JSON.stringify(item)) as BuildItem;
+    drawingItemCopy(this: any, item: CanvasNode, parent: CanvasNode[]) {
+      let clone = JSON.parse(JSON.stringify(item)) as CanvasNode;
       clone = this.createIdAndKey(clone);
       parent.push(clone);
       this.activeFormItem(clone);
     },
-    createIdAndKey(this: any, item: BuildItem): BuildItem {
+    createIdAndKey(this: any, item: CanvasNode): CanvasNode {
       item.formId = randomString(8);
       item.renderKey = Date.now();
       if (item.layout === "colFormItem") {
         item.vModel = `field${randomString(8)}`;
       } else if (item.layout === "rowFormItem") {
         item.componentName = `row${randomString(8)}`;
+      } else if (item.layout === "gridRow") {
+        item.componentName = `row${randomString(8)}`;
+      } else if (item.layout === "gridCol") {
+        item.componentName = `col${randomString(8)}`;
+        item.basis = typeof item.basis === "string" ? item.basis : "basis-1/2";
       } else if (item.layout === "card") {
         item.vModel = `field${randomString(8)}`;
       } else if (item.layout === "subTable") {
@@ -326,7 +316,7 @@ export default defineComponent({
 
       return item;
     },
-    drawingItemDelete(this: any, index: number, parent: BuildItem[]) {
+    drawingItemDelete(this: any, index: number, parent: CanvasNode[]) {
       parent.splice(index, 1);
       void nextTick(() => {
         const len = this.drawingList.length;
@@ -569,7 +559,7 @@ $lighterBlue: #409eff;
 .center-board {
   height: 100vh;
   width: auto;
-  margin: 0 350px 0 260px;
+  // margin: 0 350px 0 260px;
   box-sizing: border-box;
 }
 
@@ -607,19 +597,22 @@ $lighterBlue: #409eff;
   -ms-flex-direction: column;
   flex-direction: column;
 
-  &>.el-form {
+  &>.center-board-row-list {
     height: 100%;
   }
 }
 
 .center-board-row-list {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
+  width: 100%;
   padding: 0 0 100px 0;
 }
 
 .drawing-board {
   height: 100%;
+  width: 100%;
+  flex: 1;
   height: auto;
   min-height: 100px;
   padding-bottom: 0;
@@ -665,7 +658,7 @@ $lighterBlue: #409eff;
   }
 
   .active-from-item {
-    &>.el-form-item {
+    &>.field-content {
       background: $selectedColor;
       border-radius: 6px;
     }
@@ -685,8 +678,15 @@ $lighterBlue: #409eff;
     }
   }
 
-  .el-form-item {
+  .field-content {
     margin-bottom: 15px;
+  }
+
+  .field-label {
+    font-size: 12px;
+    color: #606266;
+    line-height: 20px;
+    margin-bottom: 6px;
   }
 
   .el-col {
@@ -705,7 +705,7 @@ $lighterBlue: #409eff;
     border: 1px dashed #ccc;
   }
 
-  .el-form-item {
+  .field-content {
     padding: 12px 10px;
   }
 }
@@ -765,7 +765,7 @@ $lighterBlue: #409eff;
     margin-bottom: 22px;
   }
 
-  .el-form-item {
+  .field-content {
     margin-bottom: 0;
   }
 
@@ -809,10 +809,33 @@ $lighterBlue: #409eff;
   }
 }
 
+.grid-row-item {
+  padding-top: 20px;
+
+  .grid-row-wrapper {
+    display: flex;
+    flex-direction: row;
+    gap: 8px;
+    align-items: stretch;
+    min-height: 120px;
+  }
+}
+
+.grid-col-item {
+  min-width: 160px;
+  flex-shrink: 0;
+  padding-top: 20px;
+
+  .grid-col-wrapper {
+    min-height: 90px;
+    width: 100%;
+  }
+}
+
 .drawing-item,
 .drawing-row-item {
   &:hover {
-    &>.el-form-item {
+    &>.field-content {
       background: $selectedColor;
       border-radius: 6px;
     }

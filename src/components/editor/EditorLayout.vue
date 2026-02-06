@@ -10,7 +10,6 @@ import { computed, ref } from 'vue';
 import EditorToolbar from './EditorToolbar.vue';
 // src/components/tool/build/index.vue
 import Tool from '@/components/tool/build/index.vue';
-import PromptPreviewDock from './PromptPreviewDock.vue';
 import PropertyInspector from './PropertyInspector.vue';
 
 const pagesStore = usePagesStore();
@@ -106,9 +105,7 @@ function toggleLeftPanel() {
         class="editor-left"
         :style="{ width: uiStore.panelSizes.leftWidth + 'px' }"
       >
-        <!-- <TemplateLibraryPanel class="panel-section flex-1" /> -->
 
-        <!-- Left resize handle -->
         <div
           class="resize-handle resize-handle-right"
           @mousedown="startResizeLeft"
@@ -127,7 +124,6 @@ function toggleLeftPanel() {
 
       <!-- Center (Structure View) -->
       <main class="editor-center">
-        <!-- <LayoutBuilder /> -->
         <!-- Tool -->
         <Tool />
         <!-- Bottom Panel -->
@@ -136,7 +132,6 @@ function toggleLeftPanel() {
           class="editor-bottom"
           :style="{ height: uiStore.panelSizes.bottomHeight + 'px' }"
         >
-          <!-- Bottom resize handle -->
           <div
             class="resize-handle resize-handle-top"
             @mousedown="startResizeBottom"

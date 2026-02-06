@@ -163,24 +163,25 @@ interface LayoutTempComponentConfig {
 
 interface LayoutComponentConfig {
   comment: string;
-  rangeFlag: boolean;
+  rangeFlag?: boolean;
   _hidden: boolean;
-  activeds: boolean;
-  isNumbers: boolean;
-  border: boolean;
-  align: string;
-  size: string;
-  stripe: boolean;
-  expand: { js: string };
-  addExpandJs: string;
-  delExpandJs: string;
+  activeds?: boolean;
+  isNumbers?: boolean;
+  border?: boolean;
+  align?: string;
+  size?: string;
+  stripe?: boolean;
+  expand?: { js: string };
+  addExpandJs?: string;
+  delExpandJs?: string;
   layout: string;
-  oneOf: string;
+  oneOf?: string;
   tagIcon: string;
   label: string;
   changeTag: boolean;
-  defaultValue: unknown[];
-  children: Record<string, unknown>[];
+  defaultValue?: unknown[];
+  children?: Record<string, unknown>[];
+  basis?: string;
 }
 
 type TriggerType = "blur" | "change";
@@ -808,27 +809,57 @@ export const layoutTempComponents: LayoutTempComponentConfig[] = [
 export const layoutComponents: LayoutComponentConfig[] = [
   {
     comment: "",
-    rangeFlag: false,
     _hidden: false,
-    activeds: true,
-    isNumbers: false,
-    border: true,
-    align: "center",
-    size: "medium",
-    stripe: false,
-    expand: {
-      js: "",
-    },
-    addExpandJs: "",
-    delExpandJs: "",
-    layout: "subTable",
-    oneOf: "subTable",
-    tagIcon: "zb",
-    label: "设计子表",
+    layout: "gridRow",
+    oneOf: "gridRow",
+    tagIcon: "component",
+    label: "GridRow",
     changeTag: false,
-    defaultValue: [],
+    children: [
+      {
+        layout: "gridCol",
+        oneOf: "gridCol",
+        tagIcon: "component",
+        label: "GridCol",
+        basis: "basis-1/2",
+        children: [],
+      },
+    ],
+  },
+  {
+    comment: "",
+    _hidden: false,
+    layout: "gridCol",
+    oneOf: "gridCol",
+    tagIcon: "component",
+    label: "GridCol",
+    changeTag: false,
+    basis: "basis-1/2",
     children: [],
   },
+  // {
+  //   comment: "",
+  //   rangeFlag: false,
+  //   _hidden: false,
+  //   activeds: true,
+  //   isNumbers: false,
+  //   border: true,
+  //   align: "center",
+  //   size: "medium",
+  //   stripe: false,
+  //   expand: {
+  //     js: "",
+  //   },
+  //   addExpandJs: "",
+  //   delExpandJs: "",
+  //   layout: "subTable",
+  //   oneOf: "subTable",
+  //   tagIcon: "zb",
+  //   label: "设计子表",
+  //   changeTag: false,
+  //   defaultValue: [],
+  //   children: [],
+  // },
 ];
 
 // 组件rule的触发方式，无触发方式的组件不生成rule
