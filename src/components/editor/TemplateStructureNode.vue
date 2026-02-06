@@ -16,8 +16,11 @@ const props = withDefaults(defineProps<{
   node: LayoutNode;
   depth: number;
   showCard?: boolean;
+  /** 嵌套模式：Grid 在 GridCell 内部时为 true，不显示边框 */
+  nested?: boolean;
 }>(), {
   showCard: true,
+  nested: false,
 });
 
 const uiStore = useUIStore();
@@ -157,11 +160,13 @@ function deleteNode() {
       v-if="isGrid"
       :node="(node as GridNode)"
       :depth="depth"
+      :nested="nested"
     >
-      <template #child="{ child, depth: childDepth }">
+      <template #child="{ child, depth: childDepth, nested: childNested }">
         <TemplateStructureNode
           :node="child"
           :depth="childDepth"
+          :nested="childNested"
         />
       </template>
     </GridContainer>
@@ -201,10 +206,11 @@ function deleteNode() {
       :depth="depth"
       :standalone="true"
     >
-      <template #child="{ child, depth: childDepth }">
+      <template #child="{ child, depth: childDepth, nested: childNested }">
         <TemplateStructureNode
           :node="child"
           :depth="childDepth"
+          :nested="childNested"
         />
       </template>
     </GridCellItem>

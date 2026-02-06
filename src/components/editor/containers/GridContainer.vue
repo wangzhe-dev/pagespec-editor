@@ -17,15 +17,28 @@ import {
 } from '@/composables/useEdgeDrag';
 import { createBlockNode } from '@/domain/registry';
 import type { GridCell, GridNode, LayoutNode } from '@/domain/schema';
-import { computed, onBeforeUnmount, ref, watch } from 'vue';
+import { computed, inject, onBeforeUnmount, ref, watch } from 'vue';
 import Draggable from 'vuedraggable';
 import NodeActions from '../NodeActions.vue';
 import GridCellItem, { type ResizeEdge, type ResizeStartPayload } from './GridCellItem.vue';
+import { IN_GRID_CELL_KEY } from './keys';
 
 const props = defineProps<{
   node: GridNode;
   depth: number;
+  /** 嵌套模式：在 GridCell 内部时为 true，不显示边框 */
+  nested?: boolean;
 }>();
+
+// 定义 slot 类型
+defineSlots<{
+  child(props: { child: LayoutNode; depth: number; nested?: boolean }): any;
+}>();
+
+// 自动检测是否在 GridCell 内部（通过 provide/inject）
+const inGridCell = inject(IN_GRID_CELL_KEY, false);
+// 嵌套模式：由 inject 自动检测或 prop 显式指定
+const isNested = computed(() => props.nested || inGridCell);
 
 const uiStore = useUIStore();
 
@@ -226,16 +239,22 @@ function normalizeRow(row: LayoutNode[], reason: 'init' | 'add' | 'drag' | 'resi
     return;
   }
 
-  // 只处理一个 cell 的特殊情况
-  if (gridCells.length === 1) {
-    const cell = gridCells[0];
-    cell.colStart = 1;
-    cell.colSpan = clamp(cell.colSpan ?? GRID_COLUMNS, 1, GRID_COLUMNS);
-    return;
-  }
+  // 核心逻辑：同一行的 GridCell 自动平分 24 列
+  const count = gridCells.length;
+  const spanPerCell = Math.floor(GRID_COLUMNS / count);
 
-  // 初始化 cell 位置
-  initializeCellPositions(gridCells, reason);
+  let nextStart = 1;
+  gridCells.forEach((cell, index) => {
+    cell.colStart = nextStart;
+    // 最后一个 cell 占用剩余空间（处理不能整除的情况）
+    if (index === count - 1) {
+      cell.colSpan = GRID_COLUMNS - nextStart + 1;
+    } else {
+      cell.colSpan = spanPerCell;
+    }
+    cell.rowSpan = clamp(cell.rowSpan ?? 1, 1, MAX_ROW_SPAN);
+    nextStart += cell.colSpan;
+  });
 }
 
 function ensureGridCellList() {
@@ -260,9 +279,47 @@ function normalizeGridLayout(reason: 'init' | 'add' | 'drag' | 'resize' | 'struc
     if (reason !== 'resize') {
       ensureGridCellList();
     }
-    const nodes = cellList.value;
-    const rows = splitRows(nodes);
-    rows.forEach(row => normalizeRow(row, reason));
+
+    // 拖拽/添加后：重新计算布局
+    // 策略：按顺序分行，每行最多放到填满 24 列，然后平分
+    if (reason === 'drag' || reason === 'add') {
+      const gridCells = cellList.value.filter(n => n.type === 'GridCell') as GridCell[];
+
+      // 计算每个 cell 最小需要多少列（至少 MIN_COL_SPAN）
+      const minSpan = MIN_COL_SPAN;
+      // 一行能放几个？
+      const maxPerRow = Math.floor(GRID_COLUMNS / minSpan);
+
+      // 按顺序分行：每行最多 maxPerRow 个
+      let rowStart = 0;
+      while (rowStart < gridCells.length) {
+        const rowEnd = Math.min(rowStart + maxPerRow, gridCells.length);
+        const rowCells = gridCells.slice(rowStart, rowEnd);
+
+        // 这一行有几个 cell，平分 24 列
+        const count = rowCells.length;
+        const spanPerCell = Math.floor(GRID_COLUMNS / count);
+        let nextStart = 1;
+
+        rowCells.forEach((cell, index) => {
+          cell.colStart = nextStart;
+          if (index === count - 1) {
+            cell.colSpan = GRID_COLUMNS - nextStart + 1;
+          } else {
+            cell.colSpan = spanPerCell;
+          }
+          cell.rowSpan = clamp(cell.rowSpan ?? 1, 1, MAX_ROW_SPAN);
+          nextStart += cell.colSpan;
+        });
+
+        rowStart = rowEnd;
+      }
+    } else {
+      // 其他情况：使用原来的 splitRows + normalizeRow 逻辑
+      const nodes = cellList.value;
+      const rows = splitRows(nodes);
+      rows.forEach(row => normalizeRow(row, reason));
+    }
   } finally {
     isNormalizing = false;
   }
@@ -302,7 +359,11 @@ const indicatorPosition = computed(() => {
   if (!edgeDrag.isDragging.value || !edgeDrag.dropPosition.value) return null;
   if (!gridCanvasRef.value) return null;
 
-  const containerRect = gridCanvasRef.value.getBoundingClientRect();
+  // gridCanvasRef 是 Draggable 组件引用，需要访问 $el 获取 DOM 元素
+  const el = (gridCanvasRef.value as any).$el as HTMLElement | undefined;
+  if (!el || typeof el.getBoundingClientRect !== 'function') return null;
+
+  const containerRect = el.getBoundingClientRect();
   const cells = edgeDrag.collectCellRects();
 
   return computeIndicatorPosition(edgeDrag.dropPosition.value, cells, containerRect);
@@ -592,7 +653,7 @@ function onGridMove(evt: any): boolean {
 
   const draggedRect = evt.draggedRect as DOMRect | undefined;
 
-  // 更新边框感知拖拽状态（传递拖拽元素的实际 rect）
+  // 更新边框感知拖拽状态
   if (edgeDrag.isDragging.value) {
     const point = getClientPoint(evt);
     const fallbackX = draggedRect ? draggedRect.left + draggedRect.width / 2 : 0;
@@ -602,7 +663,7 @@ function onGridMove(evt: any): boolean {
     edgeDrag.onDragMove({
       clientX,
       clientY,
-      draggedRect, // 传递完整的 rect
+      draggedRect,
     } as any);
   }
 
@@ -613,42 +674,29 @@ function onGridMove(evt: any): boolean {
   const relatedRect = evt.relatedRect as DOMRect | undefined;
   if (!draggedRect || !relatedRect) return true;
 
+  // 根据边框感知的方向来决定插入位置
   const activeEdge = edgeDrag.activeEdge.value;
-  if (activeEdge === 'left') {
-    evt.willInsertAfter = draggedRect.left >= relatedRect.left;
-    return true;
-  }
-  if (activeEdge === 'right') {
-    evt.willInsertAfter = draggedRect.right > relatedRect.right;
-    return true;
-  }
 
-  const crossedTop = draggedRect.top < relatedRect.top;
-  const crossedBottom = draggedRect.bottom > relatedRect.bottom;
-  const crossedLeft = draggedRect.left < relatedRect.left;
-  const crossedRight = draggedRect.right > relatedRect.right;
-
-  if (crossedTop) {
+  if (activeEdge === 'top') {
+    // 向上拖：上边框碰到目标 → 插入目标前面
     evt.willInsertAfter = false;
-    return true;
-  }
-
-  if (crossedBottom) {
+  } else if (activeEdge === 'bottom') {
+    // 向下拖：下边框碰到目标 → 插入目标后面
     evt.willInsertAfter = true;
-    return true;
-  }
-
-  if (crossedLeft) {
+  } else if (activeEdge === 'left') {
+    // 向左拖：左边框碰到目标 → 插入目标前面（同行效果）
     evt.willInsertAfter = false;
-    return true;
-  }
-
-  if (crossedRight) {
+  } else if (activeEdge === 'right') {
+    // 向右拖：右边框碰到目标 → 插入目标后面（同行效果）
     evt.willInsertAfter = true;
-    return true;
+  } else {
+    // 未检测到明确方向，使用位置判断
+    const dragCenterY = draggedRect.top + draggedRect.height / 2;
+    const relatedCenterY = relatedRect.top + relatedRect.height / 2;
+    evt.willInsertAfter = dragCenterY > relatedCenterY;
   }
 
-  return false;
+  return true;
 }
 
 // 添加时选中新节点（Grid 强制使用 GridCell 包裹）
@@ -705,8 +753,9 @@ function onDragStart(evt: any) {
 }
 
 function onDragEnd() {
+  // 清理边框感知拖拽状态
   edgeDrag.onDragEnd();
-  normalizeGridLayout('drag');
+  // 重新计算布局（同一行的 cells 自动平分）
 }
 
 
@@ -720,18 +769,13 @@ watch(
 <template>
   <div
     class="grid-container"
-    :class="{ selected: isSelected, hovered: isHovered }"
+    :class="{ selected: isSelected, hovered: isHovered, nested: isNested }"
     @click.stop="uiStore.selectNode(node.id)"
     @mouseenter.stop="uiStore.hoverNode(node.id)"
     @mouseleave.stop="uiStore.hoverNode(null)"
   >
-    <!-- 顶部拖拽区域 + 标识 -->
-    <div class="row-header">
-      <span class="row-label">Row</span>
-    </div>
-
-    <!-- 悬停时显示操作按钮 -->
-    <NodeActions v-if="showActions" :node="node" :show="showActions" class="row-actions" />
+    <!-- 悬停时显示操作按钮（嵌套模式不显示） -->
+    <NodeActions v-if="showActions && !isNested" :node="node" :show="showActions" class="row-actions" />
 
     <Draggable
       ref="gridCanvasRef"
@@ -740,7 +784,8 @@ watch(
       :group="blockDragGroup"
       :animation="200"
       :fallback-on-body="true"
-      :swap-threshold="0.65"
+      :swap-threshold="0.5"
+      :invert-swap="true"
       :filter="'.resize-handle, .cell-actions'"
       :prevent-on-filter="true"
       ghost-class="drag-ghost"
@@ -769,8 +814,8 @@ watch(
             :is-drop-target="isCellDropTarget(element.id)"
             @resize-start="onCellResizeStart"
           >
-            <template #child="{ child, depth: childDepth }">
-              <slot name="child" :child="child" :depth="childDepth" />
+            <template #child="{ child, depth: childDepth, nested: childNested }">
+              <slot name="child" :child="child" :depth="childDepth" :nested="childNested" />
             </template>
           </GridCellItem>
           <!-- 其他组件直接通过 slot 渲染 -->
@@ -814,38 +859,19 @@ watch(
   box-shadow: 0 0 0 2px rgba(var(--accent-primary-rgb), 0.2);
 }
 
-/* 顶部拖拽区域 - 用于拖动整个 Row */
-.row-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 6px 8px;
-  cursor: grab;
-  border-bottom: 1px solid var(--border-subtle);
-  margin-bottom: 8px;
-  border-radius: 6px 6px 0 0;
-  background: var(--bg-subtle);
+/* 嵌套模式：虚拟 Grid，不显示边框和背景 */
+.grid-container.nested {
+  border: none;
+  background: transparent;
+  padding: 0;
+  border-radius: 0;
+  box-shadow: none;
 }
 
-.row-header:active {
-  cursor: grabbing;
-}
-
-.row-label {
-  font-size: 10px;
-  font-weight: 600;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.grid-container.selected .row-header {
-  background: var(--accent-subtle);
-  border-bottom-color: var(--accent-primary);
-}
-
-.grid-container.selected .row-label {
-  color: var(--accent-primary);
+.grid-container.nested.hovered,
+.grid-container.nested.selected {
+  border: none;
+  box-shadow: none;
 }
 
 /* 操作按钮 - 悬停时显示在右上角 */

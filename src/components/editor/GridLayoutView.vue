@@ -119,11 +119,6 @@ function onAddRow(evt: any) {
     </div>
 
     <div v-else class="layout-canvas">
-      <div class="layout-legend">
-        <span class="legend-pill">Grid = Row</span>
-        <span class="legend-pill">GridCell = Col</span>
-      </div>
-
       <Draggable
         :list="rootRows"
         item-key="id"
@@ -131,8 +126,8 @@ function onAddRow(evt: any) {
         :animation="200"
         :fallback-on-body="true"
         :swap-threshold="0.6"
-        :filter="'.grid-canvas'"
-        :prevent-on-filter="true"
+        :filter="'.grid-canvas, .row-actions'"
+        :prevent-on-filter="false"
         ghost-class="drag-ghost"
         chosen-class="drag-chosen"
         drag-class="drag-dragging"
@@ -200,22 +195,6 @@ function onAddRow(evt: any) {
       transparent 1px
     );
   background-size: 24px 24px;
-}
-
-.layout-legend {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  color: var(--text-muted);
-  font-size: 11px;
-}
-
-.legend-pill {
-  padding: 2px 8px;
-  border-radius: 999px;
-  border: 1px solid var(--border-subtle);
-  background: var(--bg-subtle);
-  color: var(--text-secondary);
 }
 
 .root-rows {

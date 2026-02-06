@@ -11,9 +11,10 @@ import {
 } from '@/composables/useDragDrop';
 import { createBlockNode } from '@/domain/registry';
 import type { GridCell, GridNode, LayoutNode } from '@/domain/schema';
-import { computed, ref, watch } from 'vue';
+import { computed, provide, ref, watch } from 'vue';
 import Draggable from 'vuedraggable';
 import NodeActions from '../NodeActions.vue';
+import { IN_GRID_CELL_KEY } from './keys';
 
 // 递归组件名称定义
 defineOptions({ name: 'GridCellItem' });
@@ -47,6 +48,14 @@ const props = withDefaults(defineProps<{
   rowUnit: 8,
   maxRowSpan: 60,
 });
+
+// 定义 slot 类型
+defineSlots<{
+  child(props: { child: LayoutNode; depth: number; nested: boolean }): any;
+}>();
+
+// Provide 标识让子 Grid 知道自己在 GridCell 内部
+provide(IN_GRID_CELL_KEY, true);
 
 const emit = defineEmits<{
   (e: 'resize-start', payload: ResizeStartPayload): void;
@@ -326,8 +335,9 @@ function onAddBlock(evt: any) {
       >
         <template #item="{ element }">
           <div class="cell-item-wrapper">
-            <!-- 所有子节点统一通过 slot 渲染（由 TemplateStructureNode 处理具体类型） -->
-            <slot name="child" :child="element" :depth="depth + 1">
+            <!-- 所有子节点统一通过 slot 渲染（由 TemplateStructureNode 处理具体类型）-->
+            <!-- nested=true: 子 Grid 以嵌套模式渲染（虚拟/无边框）-->
+            <slot name="child" :child="element" :depth="depth + 1" :nested="true">
               <div class="child-placeholder">
                 <span>{{ element.label || element.type }}</span>
               </div>
