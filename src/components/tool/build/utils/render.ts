@@ -41,7 +41,7 @@ function guideMarks(conf: GuideMarksConf): GuideMarks {
 }
 
 function vModel(
-  emit: (event: string, ...args: any[]) => void,
+  emit: (event: any, ...args: any[]) => void,
   flatProps: Record<string, any>,
   defaultValue: any,
   conf: any

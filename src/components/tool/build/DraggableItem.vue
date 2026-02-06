@@ -1,13 +1,14 @@
 <script lang="tsx">
+/* @jsxImportSource vue */
 import { CopyDocument, Delete } from '@element-plus/icons-vue'
 import { defineComponent, type PropType } from 'vue'
 import draggable from 'vuedraggable'
 import Render from './utils/render'
 
 interface FormElement {
-  formId: string | number
-  renderKey: string | number
-  layout: string
+  formId?: string | number
+  renderKey?: string | number
+  layout?: string
   span?: number
   label?: string
   labelWidth?: number | null
@@ -90,7 +91,7 @@ export default defineComponent({
     function renderChildren(element: FormElement): any {
       if (!Array.isArray(element.children)) return null
       return element.children.map((el: FormElement, i: number) => {
-        const layoutFn = layouts[el.layout]
+        const layoutFn = el.layout ? layouts[el.layout] : undefined
         if (layoutFn && element.oneOf === 'subTable') {
           el.span = 4
           return layoutFn(el, i, element.children!)
@@ -179,7 +180,7 @@ export default defineComponent({
               >
                 {{
                   item: ({ element: el, index: i }: { element: FormElement; index: number }) => {
-                    const layoutFn = layouts[el.layout]
+                    const layoutFn = el.layout ? layouts[el.layout] : undefined
                     if (layoutFn) return layoutFn(el, i, element.children!)
                     throw new Error(`没有与${el.layout}匹配的layout`)
                   },
@@ -225,7 +226,7 @@ export default defineComponent({
                   >
                     {{
                       item: ({ element: el, index: i }: { element: FormElement; index: number }) => {
-                        const layoutFn = layouts[el.layout]
+                        const layoutFn = el.layout ? layouts[el.layout] : undefined
                         if (layoutFn) return layoutFn(el, i, element.children!)
                         throw new Error(`没有与${el.layout}匹配的layout`)
                       },
@@ -329,7 +330,7 @@ export default defineComponent({
 
     // ===== 根 render =====
     return () => {
-      const layoutFn = layouts[props.element.layout]
+      const layoutFn = props.element.layout ? layouts[props.element.layout] : undefined
       if (layoutFn) {
         return layoutFn(props.element, props.index, props.drawingList)
       }

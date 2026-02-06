@@ -6,99 +6,63 @@
           <div class="components-title">
             <svg-icon icon-class="component" />输入型组件
           </div>
-          <draggable
-            class="components-draggable"
-            :list="inputComponents"
-            :group="{ name: 'componentsGroup', pull: 'clone', put: false }"
-            :clone="cloneComponent"
-            draggable=".components-item"
-            :sort="false"
-            @end="onEnd"
-          >
-            <div
-              v-for="(element, index) in inputComponents"
-              :key="index"
-              class="components-item"
-              @click="addComponent(element)"
-            >
-              <div class="components-body">
-                <svg-icon :icon-class="element.tagIcon" />
-                {{ element.label }}
+          <draggable class="components-draggable" :list="inputComponents"
+            :group="{ name: 'componentsGroup', pull: 'clone', put: false }" :clone="cloneComponent"
+            draggable=".components-item" :sort="false" item-key="label" @end="onEnd">
+            <template #item="{ element }">
+              <div class="components-item" @click="addComponent(element)">
+                <div class="components-body">
+                  <svg-icon :icon-class="element.tagIcon" />
+                  {{ element.label }}
+                </div>
               </div>
-            </div>
+            </template>
           </draggable>
           <div class="components-title">
             <svg-icon icon-class="component" />选择型组件
           </div>
-          <draggable
-            class="components-draggable"
-            :list="selectComponents"
-            :group="{ name: 'componentsGroup', pull: 'clone', put: false }"
-            :clone="cloneComponent"
-            draggable=".components-item"
-            :sort="false"
-            @end="onEnd"
-          >
-            <div
-              v-for="(element, index) in selectComponents"
-              :key="index"
-              class="components-item"
-              @click="addComponent(element)"
-            >
-              <div class="components-body">
-                <svg-icon :icon-class="element.tagIcon" />
-                {{ element.label }}
+          <draggable class="components-draggable" :list="selectComponents"
+            :group="{ name: 'componentsGroup', pull: 'clone', put: false }" :clone="cloneComponent"
+            draggable=".components-item" :sort="false" item-key="label" @end="onEnd">
+            <template #item="{ element }">
+              <div class="components-item" @click="addComponent(element)">
+                <div class="components-body">
+                  <svg-icon :icon-class="element.tagIcon" />
+                  {{ element.label }}
+                </div>
               </div>
-            </div>
+            </template>
           </draggable>
 
           <div class="components-title">
             <svg-icon icon-class="component" /> 模版型组件
           </div>
-          <draggable
-            class="components-draggable"
-            :list="layoutTempComponents"
-            :group="{ name: 'componentsGroup', pull: 'clone', put: false }"
-            :clone="cloneComponent"
-            draggable=".components-item"
-            :sort="false"
-            @end="onEnd"
-          >
-            <div
-              v-for="(element, index) in layoutTempComponents"
-              :key="index"
-              class="components-item"
-              @click="addComponent(element)"
-            >
-              <div class="components-body">
-                <svg-icon :icon-class="element.tagIcon" />
-                {{ element.label }}
+          <draggable class="components-draggable" :list="layoutTempComponents"
+            :group="{ name: 'componentsGroup', pull: 'clone', put: false }" :clone="cloneComponent"
+            draggable=".components-item" :sort="false" item-key="label" @end="onEnd">
+            <template #item="{ element }">
+              <div class="components-item" @click="addComponent(element)">
+                <div class="components-body">
+                  <svg-icon :icon-class="element.tagIcon" />
+                  {{ element.label }}
+                </div>
               </div>
-            </div>
+            </template>
           </draggable>
           <div class="components-title">
             <svg-icon icon-class="component" /> 布局型组件
           </div>
-          <draggable
-            class="components-draggable"
-            :list="layoutComponents"
-            :group="{ name: 'componentsGroup', pull: 'clone', put: false }"
-            :clone="cloneComponent"
-            draggable=".components-item"
-            :sort="false"
-            @end="onEnd"
-          >
-            <div
-              v-for="(element, index) in layoutComponents"
-              :key="index"
-              class="components-item"
-              @click="addComponent(element)"
-            >
-              <div class="components-body">
-                <svg-icon :icon-class="element.tagIcon" />
-                {{ element.label }}
+          <draggable class="components-draggable" :list="layoutComponents"
+            :group="{ name: 'componentsGroup', pull: 'clone', put: false }" :clone="cloneComponent"
+            draggable=".components-item" :sort="false" item-key="label" @end="onEnd">
+            <template #item="{ element }">
+              <div class="components-item" @click="addComponent(element)">
+                <div class="components-body">
+                  <svg-icon :icon-class="element.tagIcon" />
+                  {{ element.label }}
+                </div>
               </div>
-            </div>
+            </template>
           </draggable>
         </div>
       </el-scrollbar>
@@ -108,31 +72,15 @@
       <div class="center-scrollbar">
         <div class="center-board-container">
           <div class="center-board-row">
-            <el-form
-              :size="formConf.size"
-              :label-position="formConf.labelPosition"
-              :disabled="formConf.disabled"
-              :label-width="formConf.labelWidth + 'px'"
-              class="center-board-row-list"
-            >
-              <draggable
-                class="drawing-board"
-                :list="drawingList"
-                :animation="340"
-                group="componentsGroup"
-              >
-                <draggable-item
-                  v-for="(element, index) in drawingList"
-                  :key="element.renderKey"
-                  :drawing-list="drawingList"
-                  :element="element"
-                  :index="index"
-                  :active-id="activeId"
-                  :form-conf="formConf"
-                  @activeItem="activeFormItem"
-                  @copyItem="drawingItemCopy"
-                  @deleteItem="drawingItemDelete"
-                />
+            <el-form :size="formConf.size" :label-position="formConf.labelPosition" :disabled="formConf.disabled"
+              :label-width="formConf.labelWidth + 'px'" class="center-board-row-list">
+              <draggable class="drawing-board" :list="drawingList" :animation="340" group="componentsGroup"
+                item-key="formId">
+                <template #item="{ element, index }">
+                  <draggable-item :key="element.renderKey ?? element.formId ?? index" :drawing-list="drawingList"
+                    :element="element" :index="index" :active-id="activeId" :form-conf="formConf"
+                    @activeItem="activeFormItem" @copyItem="drawingItemCopy" @deleteItem="drawingItemDelete" />
+                </template>
               </draggable>
               <div v-show="!drawingList.length" class="empty-info">
                 从左侧拖入或点选组件进行表单设计
@@ -145,7 +93,7 @@
   </div>
 </template>
 
-<script>
+<script lang="ts">
 import {
   formConf,
   inputComponents,
@@ -153,19 +101,42 @@ import {
   layoutTempComponents,
   selectComponents,
 } from "./utils/config.ts";
-
-import { packageOptions, randomString, titleCase } from "@/utils/index.ts";
+import { defineComponent, nextTick } from "vue";
+import { randomString, titleCase } from "@/utils/index.ts";
 import draggable from "vuedraggable";
 import DraggableItem from "./DraggableItem.vue";
-import render from "./utils/render.ts";
 
-let oldActiveId;
-let tempActiveData;
+type FormId = string | number;
 
-export default {
+
+
+interface BuildItem {
+  formId?: FormId;
+  renderKey?: string | number;
+  layout?: string;
+  oneOf?: string;
+  tempComponents?: boolean;
+  tag?: string;
+  tagIcon?: string;
+  label?: string;
+  placeholder?: string;
+  vModel?: string;
+  componentName?: string;
+  gutter?: number;
+  dictCode?: string;
+  options?: unknown[];
+  span?: number;
+  children?: BuildItem[];
+  [key: string]: unknown;
+}
+
+let oldActiveId: FormId | undefined;
+let tempActiveData: BuildItem | undefined;
+let oldBodyOnDrop: ((this: GlobalEventHandlers, ev: DragEvent) => unknown) | null = null;
+
+export default defineComponent({
   components: {
     draggable,
-    render,
     DraggableItem,
   },
   data() {
@@ -177,84 +148,92 @@ export default {
       layoutComponents,
       layoutTempComponents,
       labelWidth: 100,
-      drawingList: [],
-      drawingData: {},
-      activeId: 1,
+      drawingList: [] as BuildItem[],
+      drawingData: {} as Record<string, unknown>,
+      activeId: 1 as FormId,
       drawerVisible: false,
-      formData: {},
+      formData: {} as Record<string, unknown>,
       dialogVisible: false,
-      generateConf: null,
+      generateConf: null as unknown,
       showFileName: false,
-      activeData: {},
+      activeData: {} as BuildItem,
       pageTypes: "create",
-      jsonTemplate: {},
+      jsonTemplate: {} as Record<string, unknown>,
       dictChild: null,
       dragging: false,
-      draggedControl: {},
+      draggedControl: {} as BuildItem,
     };
   },
   created() {
     // 防止 firefox 下 拖拽 会新打卡一个选项卡
-    document.body.ondrop = (event) => {
+    oldBodyOnDrop = document.body.ondrop;
+    document.body.ondrop = (event: DragEvent) => {
       event.preventDefault();
       event.stopPropagation();
     };
-
+  },
+  beforeUnmount() {
+    document.body.ondrop = oldBodyOnDrop;
   },
   watch: {
-    "activeData.label": function (val, oldVal) {
+    "activeData.label": function (
+      this: { activeData: BuildItem; activeId: FormId },
+      val: string | undefined,
+      oldVal: string | undefined
+    ) {
+      const { activeData } = this;
       if (
-        this.activeData.placeholder === undefined ||
-        !this.activeData.tag ||
+        typeof activeData.placeholder !== "string" ||
+        !activeData.tag ||
         oldActiveId !== this.activeId
       ) {
         return;
       }
-      this.activeData.placeholder =
-        this.activeData.placeholder.replace(oldVal, "") + val;
+      activeData.placeholder =
+        activeData.placeholder.replace(oldVal ?? "", "") + (val ?? "");
     },
 
     activeId: {
-      handler(val) {
+      handler(val: FormId) {
         oldActiveId = val;
       },
       immediate: true,
     },
-
   },
-
-
-
-
   methods: {
-    activeFormItem(element) {
+    activeFormItem(this: { activeData: BuildItem; activeId: FormId }, element: BuildItem) {
       this.activeData = element;
-      this.activeId = element.formId;
+      this.activeId = element.formId ?? randomString(8);
     },
-    onEnd(obj, a) {
+    onEnd(
+      this: { activeData: BuildItem; activeId: FormId },
+      obj: { from: unknown; to: unknown }
+    ) {
       if (obj.from !== obj.to) {
-        this.activeData = tempActiveData;
+        this.activeData = tempActiveData ?? {};
         this.activeId = randomString(8);
       }
     },
-    addComponent(item) {
+    addComponent(this: any, item: BuildItem) {
       const clone = this.cloneComponent(item);
       this.drawingList.push(clone);
       this.activeFormItem(clone);
     },
-    cloneComponent(origin) {
-      const clone = JSON.parse(JSON.stringify(origin));
+    cloneComponent(this: any, origin: BuildItem): BuildItem {
+      const clone = JSON.parse(JSON.stringify(origin)) as BuildItem;
       clone.formId = randomString(8);
       clone.span = formConf.span;
-      clone.renderKey = +new Date(); // 改变renderKey后可以实现强制更新组件
+      clone.renderKey = Date.now(); // 改变renderKey后可以实现强制更新组件
 
       if (!clone.layout) clone.layout = "colFormItem";
       if (clone.layout === "colFormItem") {
-        if (clone.tag == "el-divider") {
+        if (clone.tag === "el-divider") {
           delete clone.label;
         } else {
           clone.vModel = `field${randomString(8)}`;
-          clone.placeholder !== undefined && (clone.placeholder += clone.label);
+          if (typeof clone.placeholder === "string" && typeof clone.label === "string") {
+            clone.placeholder += clone.label;
+          }
         }
         tempActiveData = clone;
       } else if (clone.layout === "rowFormItem" && !clone.oneOf) {
@@ -262,26 +241,6 @@ export default {
           delete clone.label;
           clone.componentName = `row${randomString(8)}`;
           clone.gutter = this.formConf.gutter;
-          if (clone.children) {
-            for (let i = 0; i < clone.children.length; i++) {
-              const cloneItem = clone.children[i];
-              if (cloneItem && cloneItem.dictCode) {
-                this.getDicts(cloneItem.dictCode).then((res) => {
-                  if (res.code == 200) {
-                    this.$set(
-                      cloneItem,
-                      "options",
-                      packageOptions(res.data, "dictLabel", "dictValue")
-                    );
-                  } else {
-                    console.group(`查询字典(${column.dictCode})发生异常`);
-                    console.warn(res.message);
-                    console.groupEnd();
-                  }
-                });
-              }
-            }
-          }
         } else {
           delete clone.label;
           clone.componentName = `row${randomString(8)}`;
@@ -295,7 +254,7 @@ export default {
       } else if (clone.layout === "card" && !clone.oneOf) {
         // 卡片容器
         delete clone.label;
-        if (clone.tagIcon == "ocr") {
+        if (clone.tagIcon === "ocr") {
           clone.vModel = `field${randomString(8)}`;
         }
         clone.componentName = `row${randomString(8)}`;
@@ -306,33 +265,37 @@ export default {
         clone.gutter = this.formConf.gutter;
         tempActiveData = clone;
       }
-      return tempActiveData;
+      return tempActiveData ?? clone;
     },
-    AssembleFormData() {
+    AssembleFormData(this: any) {
       this.formData = {
         fields: JSON.parse(JSON.stringify(this.drawingList)),
         ...this.formConf,
       };
     },
-    generate(data) {
-      const func = this[`exec${titleCase(this.operationType)}`];
+    generate(this: any, data: unknown) {
+      const operationType =
+        typeof this.operationType === "string" ? this.operationType : "";
+      const func = this[`exec${titleCase(operationType)}`] as
+        | ((payload: unknown) => void)
+        | undefined;
       this.generateConf = data;
       func && func(data);
     },
-    execRun(data) {
+    execRun(this: any) {
       this.AssembleFormData();
       this.drawerVisible = true;
     },
 
-    drawingItemCopy(item, parent) {
-      let clone = JSON.parse(JSON.stringify(item));
+    drawingItemCopy(this: any, item: BuildItem, parent: BuildItem[]) {
+      let clone = JSON.parse(JSON.stringify(item)) as BuildItem;
       clone = this.createIdAndKey(clone);
       parent.push(clone);
       this.activeFormItem(clone);
     },
-    createIdAndKey(item) {
+    createIdAndKey(this: any, item: BuildItem): BuildItem {
       item.formId = randomString(8);
-      item.renderKey = +new Date();
+      item.renderKey = Date.now();
       if (item.layout === "colFormItem") {
         item.vModel = `field${randomString(8)}`;
       } else if (item.layout === "rowFormItem") {
@@ -363,35 +326,32 @@ export default {
 
       return item;
     },
-    drawingItemDelete(index, parent) {
+    drawingItemDelete(this: any, index: number, parent: BuildItem[]) {
       parent.splice(index, 1);
-      this.$nextTick(() => {
+      void nextTick(() => {
         const len = this.drawingList.length;
         if (len) {
           this.activeFormItem(this.drawingList[len - 1]);
         }
       });
     },
-
-
-
-
-
-
   },
-};
+});
 </script>
 
 <style lang="scss">
 .editor-tabs {
   background: #121315;
+
   .el-tabs__header {
     margin: 0;
     border-bottom-color: #121315;
+
     .el-tabs__nav {
       border-color: #121315;
     }
   }
+
   .el-tabs__item {
     height: 32px;
     line-height: 32px;
@@ -401,46 +361,56 @@ export default {
     margin-right: 5px;
     user-select: none;
   }
+
   .el-tabs__item.is-active {
     background: #1e1e1e;
     border-bottom-color: #1e1e1e !important;
     color: #fff;
   }
+
   .el-icon-edit {
     color: #f1fa8c;
   }
+
   .el-icon-document {
     color: #a95812;
   }
 }
+
 // home
 .right-scrollbar {
   .el-scrollbar__view {
     padding: 12px 18px 15px 15px;
   }
 }
+
 .left-scrollbar .el-scrollbar__wrap {
   box-sizing: border-box;
   overflow-x: hidden !important;
   margin-bottom: 0 !important;
 }
+
 .center-tabs {
   .el-tabs__header {
     margin-bottom: 0 !important;
   }
+
   .el-tabs__item {
     width: 33%;
     text-align: center;
   }
+
   .el-tabs__nav {
     width: 100%;
   }
 }
+
 .reg-item {
   padding: 12px 6px;
   background: #f8f8f8;
   position: relative;
   border-radius: 4px;
+
   .close-btn {
     position: absolute;
     right: -6px;
@@ -456,18 +426,22 @@ export default {
     z-index: 1;
     cursor: pointer;
     font-size: 12px;
+
     &:hover {
       background: rgba(210, 23, 23, 0.5);
     }
   }
-  & + .reg-item {
+
+  &+.reg-item {
     margin-top: 18px;
   }
 }
+
 .action-bar {
-  & .el-button + .el-button {
+  & .el-button+.el-button {
     margin-left: 15px;
   }
+
   & i {
     font-size: 20px;
     vertical-align: middle;
@@ -479,15 +453,19 @@ export default {
 .custom-tree-node {
   width: 100%;
   font-size: 14px;
+
   .node-operation {
     float: right;
   }
-  i[class*="el-icon"] + i[class*="el-icon"] {
+
+  i[class*="el-icon"]+i[class*="el-icon"] {
     margin-left: 6px;
   }
+
   .el-icon-plus {
     color: #409eff;
   }
+
   .el-icon-delete {
     color: #157a0c;
   }
@@ -501,6 +479,7 @@ export default {
   display: inline-block;
   vertical-align: text-top;
 }
+
 .el-upload__tip {
   line-height: 1.2;
 }
@@ -518,6 +497,7 @@ $lighterBlue: #409eff;
   padding: 8px;
   box-sizing: border-box;
   height: 100%;
+
   .components-item {
     display: inline-block;
     width: 48%;
@@ -525,13 +505,16 @@ $lighterBlue: #409eff;
     transition: transform 0ms !important;
   }
 }
+
 .components-draggable {
   padding-bottom: 20px;
 }
+
 .components-title {
   font-size: 14px;
   color: #222;
   margin: 6px 2px;
+
   .svg-icon {
     color: #666;
     font-size: 18px;
@@ -545,13 +528,16 @@ $lighterBlue: #409eff;
   cursor: move;
   border: 1px dashed $selectedColor;
   border-radius: 3px;
+
   .svg-icon {
     color: #777;
     font-size: 15px;
   }
+
   &:hover {
     border: 1px dashed #787be8;
     color: #787be8;
+
     .svg-icon {
       color: #787be8;
     }
@@ -565,10 +551,12 @@ $lighterBlue: #409eff;
   top: 0;
   height: 100vh;
 }
+
 .left-scrollbar {
   height: calc(100vh - 130px);
   overflow: hidden;
 }
+
 .center-scrollbar {
   height: calc(100vh - 120px);
   border-left: 1px solid #f1e8e8;
@@ -594,6 +582,7 @@ $lighterBlue: #409eff;
   border: 1px solid #f1e8e8;
   border-top: none;
   border-left: none;
+
   .delete-btn {
     color: #f56c6c;
   }
@@ -617,7 +606,8 @@ $lighterBlue: #409eff;
   -webkit-box-direction: normal;
   -ms-flex-direction: column;
   flex-direction: column;
-  & > .el-form {
+
+  &>.el-form {
     height: 100%;
   }
 }
@@ -627,23 +617,28 @@ $lighterBlue: #409eff;
   flex-direction: column;
   padding: 0 0 100px 0;
 }
+
 .drawing-board {
   height: 100%;
   height: auto;
   min-height: 100px;
   padding-bottom: 0;
+
   & .el-card__header {
     background-color: #f4f4f5 !important;
   }
+
   .components-body {
     padding: 0;
     margin: 0;
     font-size: 0;
   }
+
   .sortable-ghost {
     position: relative;
     display: block;
     overflow: hidden;
+
     &::before {
       content: " ";
       position: absolute;
@@ -655,6 +650,7 @@ $lighterBlue: #409eff;
       z-index: 2;
     }
   }
+
   .components-item.sortable-ghost {
     width: 100%;
     height: 60px;
@@ -667,20 +663,24 @@ $lighterBlue: #409eff;
     align-items: center;
     flex-direction: column;
   }
+
   .active-from-item {
-    & > .el-form-item {
+    &>.el-form-item {
       background: $selectedColor;
       border-radius: 6px;
     }
-    & > .from-item-divider {
+
+    &>.from-item-divider {
       background: $selectedColor;
       border-radius: 6px;
     }
-    & > .drawing-item-copy,
-    & > .drawing-item-delete {
+
+    &>.drawing-item-copy,
+    &>.drawing-item-delete {
       display: initial;
     }
-    & > .component-name {
+
+    &>.component-name {
       color: $lighterBlue;
     }
   }
@@ -688,19 +688,23 @@ $lighterBlue: #409eff;
   .el-form-item {
     margin-bottom: 15px;
   }
+
   .el-col {
     margin-bottom: 22px;
   }
 }
+
 .drawing-item {
   position: relative;
   cursor: move;
   display: block;
   min-height: 50px;
   height: auto;
-  &.unfocus-bordered:not(.activeFromItem) > div:first-child {
+
+  &.unfocus-bordered:not(.activeFromItem)>div:first-child {
     border: 1px dashed #ccc;
   }
+
   .el-form-item {
     padding: 12px 10px;
   }
@@ -720,6 +724,7 @@ $lighterBlue: #409eff;
   height: auto;
   padding: 0 2px;
   margin-bottom: 15px;
+
   // margin-top: 22px;
   .layoutColGrid-item {
     height: 100% !important;
@@ -728,11 +733,14 @@ $lighterBlue: #409eff;
 
     .drag-layoutGrid-wrapper {
       min-height: 100px;
-      height: auto !important; /* 高度自适应 */
+      height: auto !important;
+      /* 高度自适应 */
     }
   }
+
   .layoutColGrid-item:nth-of-type(even) {
-    border-left: 1px dashed #ccc !important; /* 添加左侧边框 */
+    border-left: 1px dashed #ccc !important;
+    /* 添加左侧边框 */
   }
 
   .el-card__body {
@@ -740,21 +748,27 @@ $lighterBlue: #409eff;
     min-height: 100px;
     display: flex;
     flex-direction: column;
+
     .drag-card-wrapper {
       min-height: 100px;
       height: 100% !important;
-      height: auto; /* 高度自适应 */
+      height: auto;
+      /* 高度自适应 */
     }
   }
+
   .drawing-row-item {
     margin-bottom: 2px;
   }
+
   .el-col {
     margin-bottom: 22px;
   }
+
   .el-form-item {
     margin-bottom: 0;
   }
+
   .drag-wrapper {
     min-height: 80px;
     height: 100% !important;
@@ -768,15 +782,18 @@ $lighterBlue: #409eff;
     border: 1px solid $lighterBlue;
     cursor: move;
   }
+
   &.active-from-layoutGrid-item {
     border: 1px solid $lighterBlue;
     cursor: move;
   }
+
   .clearfix:before,
   .clearfix:after {
     display: table;
     content: "";
   }
+
   .clearfix:after {
     clear: both;
   }
@@ -795,21 +812,24 @@ $lighterBlue: #409eff;
 .drawing-item,
 .drawing-row-item {
   &:hover {
-    & > .el-form-item {
+    &>.el-form-item {
       background: $selectedColor;
       border-radius: 6px;
     }
-    & > .from-item-divider {
+
+    &>.from-item-divider {
       background: $selectedColor;
       border-radius: 6px;
     }
-    & > .drawing-item-copy,
-    & > .drawing-item-delete {
+
+    &>.drawing-item-copy,
+    &>.drawing-item-delete {
       display: initial;
     }
   }
-  & > .drawing-item-copy,
-  & > .drawing-item-delete {
+
+  &>.drawing-item-copy,
+  &>.drawing-item-delete {
     display: none;
     position: absolute;
     top: -10px;
@@ -823,21 +843,25 @@ $lighterBlue: #409eff;
     cursor: pointer;
     z-index: 1;
   }
-  & > .drawing-item-copy {
+
+  &>.drawing-item-copy {
     right: 56px;
     border-color: $lighterBlue;
     color: $lighterBlue;
     background: #fff;
+
     &:hover {
       background: $lighterBlue;
       color: #fff;
     }
   }
-  & > .drawing-item-delete {
+
+  &>.drawing-item-delete {
     right: 24px;
     border-color: #f56c6c;
     color: #f56c6c;
     background: #fff;
+
     &:hover {
       background: #f56c6c;
       color: #fff;

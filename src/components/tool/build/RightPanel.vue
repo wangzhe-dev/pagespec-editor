@@ -528,33 +528,35 @@
                 :animation="340"
                 group="selectItem"
                 handle=".option-drag"
+                :item-key="
+                  (item) =>
+                    item.__dragKey || (item.__dragKey = randomString(8))
+                "
               >
-                <div
-                  v-for="(item, index) in activeData.options"
-                  :key="index"
-                  class="select-item"
-                >
-                  <div class="select-line-icon option-drag">
-                    <i class="el-icon-s-operation" />
+                <template #item="{ element: item, index }">
+                  <div class="select-item">
+                    <div class="select-line-icon option-drag">
+                      <i class="el-icon-s-operation" />
+                    </div>
+                    <el-input
+                      v-model="item.label"
+                      placeholder="选项名"
+                      size="small"
+                    />
+                    <el-input
+                      placeholder="选项值"
+                      size="small"
+                      :value="item.value"
+                      @input="setOptionValue(item, $event)"
+                    />
+                    <div
+                      class="close-btn select-line-icon"
+                      @click="activeData.options.splice(index, 1)"
+                    >
+                      <i class="el-icon-remove-outline" />
+                    </div>
                   </div>
-                  <el-input
-                    v-model="item.label"
-                    placeholder="选项名"
-                    size="small"
-                  />
-                  <el-input
-                    placeholder="选项值"
-                    size="small"
-                    :value="item.value"
-                    @input="setOptionValue(item, $event)"
-                  />
-                  <div
-                    class="close-btn select-line-icon"
-                    @click="activeData.options.splice(index, 1)"
-                  >
-                    <i class="el-icon-remove-outline" />
-                  </div>
-                </div>
+                </template>
               </draggable>
               <div style="margin-left: 20px">
                 <el-button
