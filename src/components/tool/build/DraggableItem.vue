@@ -88,6 +88,34 @@ export default defineComponent({
     const getChildren = (node: CanvasNode): CanvasNode[] =>
       Array.isArray(node.children) ? node.children : []
 
+    const spanToBasisClassMap: Record<number, string> = {
+      24: 'basis-full',
+      20: 'basis-5/6',
+      18: 'basis-3/4',
+      16: 'basis-2/3',
+      12: 'basis-1/2',
+      8: 'basis-1/3',
+      6: 'basis-1/4',
+      4: 'basis-1/6',
+    }
+
+    function resolveSpanLayout(span: unknown): { basisClass: string; style?: Record<string, string> } {
+      const raw = Number(span ?? 24)
+      const normalized = Number.isFinite(raw) ? Math.min(24, Math.max(1, raw)) : 24
+      const basisClass = spanToBasisClassMap[normalized]
+      if (basisClass) {
+        return { basisClass }
+      }
+      const percent = (normalized / 24) * 100
+      return {
+        basisClass: 'basis-full',
+        style: {
+          flexBasis: `${percent}%`,
+          maxWidth: `${percent}%`,
+        },
+      }
+    }
+
     // ===== 操作按钮 =====
     const itemBtns = (element: CanvasNode, index: number, parent: CanvasNode[]) => {
       return [
@@ -142,14 +170,15 @@ export default defineComponent({
           props.activeId === element.formId
             ? 'drawing-item active-from-item'
             : 'drawing-item'
+        const { basisClass, style } = resolveSpanLayout(element.span)
         if (props.formConf.unFocusedComponentBorder) {
           className += ' unfocus-bordered'
         }
 
         return (
-          <el-col
-            span={element.span}
-            class={className}
+          <div
+            class={`${className} ${basisClass} shrink-0`}
+            style={style}
             onClick={(event: MouseEvent) => {
               emit('activeItem', element)
               event.stopPropagation()
@@ -173,7 +202,7 @@ export default defineComponent({
               />
             </div>
             {itemBtns(element, index, parent)}
-          </el-col>
+          </div>
         )
       },
 
@@ -182,9 +211,10 @@ export default defineComponent({
           props.activeId === element.formId
             ? 'drawing-row-item active-from-item'
             : 'drawing-row-item'
+        const { basisClass, style } = resolveSpanLayout(element.span)
 
         return (
-          <el-col span={element.span}>
+          <div class={`${basisClass} shrink-0`} style={style}>
             <el-row
               gutter={element.gutter}
               class={className}
@@ -196,7 +226,7 @@ export default defineComponent({
               {renderDraggableChildren(element, 'drag-wrapper')}
               {itemBtns(element, index, parent)}
             </el-row>
-          </el-col>
+          </div>
         )
       },
 
@@ -247,15 +277,16 @@ export default defineComponent({
           props.activeId === element.formId
             ? 'drawing-row-item active-from-card-item'
             : 'drawing-row-item'
+        const { basisClass, style } = resolveSpanLayout(element.span)
 
         return (
-          <el-col
-            span={element.span}
+          <div
+            class={`${className} ${basisClass} shrink-0`}
+            style={style}
             onClick={(event: MouseEvent) => {
               emit('activeItem', element)
               event.stopPropagation()
             }}
-            class={className}
           >
             <el-card shadow="never" body-style="padding:5px">
               {{
@@ -272,84 +303,24 @@ export default defineComponent({
               }}
             </el-card>
             {itemBtns(element, index, parent)}
-          </el-col>
+          </div>
         )
       },
-
-      text(element, index, parent) {
-        let className =
-          props.activeId === element.formId
-            ? 'drawing-item active-from-item'
-            : 'drawing-item'
-        if (props.formConf.unFocusedComponentBorder) {
-          className += ' unfocus-bordered'
-        }
-
-        return (
-          <el-col
-            span={element.span}
-            class={className}
-            onClick={(event: MouseEvent) => {
-              emit('activeItem', element)
-              event.stopPropagation()
-            }}
-          >
-            <div class="field-content">
-              <Render
-                key={element.renderKey}
-                conf={element}
-                {...{
-                  'onUpdate:modelValue': (val: any) => {
-                    element.defaultValue = val
-                  },
-                }}
-              />
-            </div>
-            {itemBtns(element, index, parent)}
-          </el-col>
-        )
-      },
-
-      fgx(element, index, parent) {
-        let className =
-          props.activeId === element.formId
-            ? 'drawing-item active-from-item'
-            : 'drawing-item'
-        if (props.formConf.unFocusedComponentBorder) {
-          className += ' unfocus-bordered'
-        }
-
-        return (
-          <el-col
-            span={element.span}
-            class={className}
-            onClick={(event: MouseEvent) => {
-              emit('activeItem', element)
-              event.stopPropagation()
-            }}
-          >
-            <div class="from-item-divider">
-              <el-divider key={element.renderKey} />
-            </div>
-            {itemBtns(element, index, parent)}
-          </el-col>
-        )
-      },
-
       subTable(element, index, parent) {
         const className =
           props.activeId === element.formId
             ? 'drawing-row-item active-from-card-item'
             : 'drawing-row-item'
+        const { basisClass, style } = resolveSpanLayout(element.span)
 
         return (
-          <el-col
-            span={element.span}
+          <div
+            class={`${className} ${basisClass} shrink-0`}
+            style={style}
             onClick={(event: MouseEvent) => {
               emit('activeItem', element)
               event.stopPropagation()
             }}
-            class={className}
           >
             <div class="field-content">
               {element.label ? (
@@ -361,7 +332,7 @@ export default defineComponent({
               <c-gener-table widget={element} />
             </div>
             {itemBtns(element, index, parent)}
-          </el-col>
+          </div>
         )
       },
     }
