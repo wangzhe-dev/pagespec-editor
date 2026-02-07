@@ -1,1 +1,9 @@
-export type { RecipeMeta, RecipeParam, CompiledRecipe } from './recipe.builtin';
+export interface BuiltinRecipe {
+  id: string;
+  label: string;
+  trigger: string;
+  action: string;
+  targetHint: string;
+  promptText: string;
+  checklistText: string;
+}

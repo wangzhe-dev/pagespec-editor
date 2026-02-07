@@ -1,338 +1,518 @@
-/**
- * Pages Store
- * 页面数据管理
- */
-
-import { createBlockNode } from '@/core/ops/create';
-import type { LayoutNode, PageSpec, Recipe } from '@/core/model/types';
-import { nanoid } from 'nanoid';
 import { defineStore } from 'pinia';
 import { computed, ref } from 'vue';
+import {
+  createContainer,
+  createEmptySpec,
+  createLeaf,
+  deleteNodeCascade,
+  downgradeGridToSingle,
+  duplicateSpec,
+  findHostByGridId,
+  getGridContainer,
+  getNode,
+  getSlotHost,
+  replaceGridItemChild,
+  replaceSingleChild,
+  setSlotSingle,
+  upgradeSlotToGrid,
+  addGridItem,
+  removeGridItem,
+  updateGridGeom,
+  cleanupOrphans,
+  clearSlot,
+} from '@/core/ops';
+import { exportJSON, importJSON } from '@/core/persistence/importExport';
+import { deleteSpec, listSpecs, loadSpec, markTemplate, saveSpec } from '@/core/persistence/storage';
+import type {
+  ContainerType,
+  LeafMeta,
+  LeafType,
+  Node,
+  NodeId,
+  PaletteContainerType,
+  PaletteLeafType,
+  PromptMode,
+  Spec,
+  SpecSummary,
+} from '@/core/model/types';
+import { isContainer, isLeaf, isSlotHost } from '@/core/model/guards';
 
-export const usePagesStore = defineStore('pages', () => {
-  // ============================================================================
-  // State
-  // ============================================================================
+export type AddMode = 'replace' | 'append';
 
-  const pages = ref<PageSpec[]>([]);
-  const activePageId = ref<string | null>(null);
+export interface BlockPick {
+  kind: 'leaf' | 'container';
+  type: PaletteLeafType | PaletteContainerType;
+  componentRef?: string;
+}
 
-  // ============================================================================
-  // Getters
-  // ============================================================================
+export interface SpecEditorSettings {
+  includeGeometry: boolean;
+  autoDowngrade: boolean;
+  promptMode: PromptMode;
+}
 
-  const activePage = computed(() => {
-    if (!activePageId.value) return null;
-    return pages.value.find(p => p.id === activePageId.value) || null;
+interface ParentRef {
+  kind: 'slot-single' | 'grid-item';
+  hostId?: string;
+  gridId?: string;
+  itemId?: string;
+}
+
+function isLeafType(type: string): type is LeafType {
+  return ['table', 'chart', 'list', 'tree', 'kpi', 'form', 'custom'].includes(type);
+}
+
+function isContainerType(type: string): type is ContainerType {
+  return ['page', 'section', 'card', 'tabs', 'split', 'grid', 'dialog', 'drawer'].includes(type);
+}
+
+function sortedGridChildIds(node: Node): string[] {
+  if (!isContainer(node) || node.type !== 'grid') return [];
+
+  return (node.items || [])
+    .slice()
+    .sort((a, b) => {
+      if (a.y !== b.y) return a.y - b.y;
+      if (a.x !== b.x) return a.x - b.x;
+      return a.itemId.localeCompare(b.itemId);
+    })
+    .map(item => item.childId);
+}
+
+function childrenOf(spec: Spec, nodeId: string): string[] {
+  const node = spec.nodes[nodeId];
+  if (!node || !isContainer(node)) return [];
+
+  const children: string[] = [];
+
+  if (isSlotHost(node) && node.slot) {
+    if (node.slot.kind === 'single') {
+      children.push(node.slot.childId);
+    } else if (node.slot.kind === 'grid') {
+      children.push(node.slot.gridId);
+    }
+  }
+
+  children.push(...sortedGridChildIds(node));
+  return children;
+}
+
+function findPath(spec: Spec, targetId: string): string[] {
+  const path: string[] = [];
+  const visited = new Set<string>();
+
+  const dfs = (currentId: string): boolean => {
+    if (visited.has(currentId)) return false;
+    visited.add(currentId);
+
+    path.push(currentId);
+    if (currentId === targetId) return true;
+
+    for (const childId of childrenOf(spec, currentId)) {
+      if (dfs(childId)) return true;
+    }
+
+    path.pop();
+    return false;
+  };
+
+  if (!dfs(spec.rootId)) {
+    return [];
+  }
+
+  return path;
+}
+
+function findParentRef(spec: Spec, childId: string): ParentRef | null {
+  for (const node of Object.values(spec.nodes)) {
+    if (!isContainer(node)) continue;
+
+    if (isSlotHost(node) && node.slot?.kind === 'single' && node.slot.childId === childId) {
+      return { kind: 'slot-single', hostId: node.id };
+    }
+
+    if (node.type === 'grid') {
+      const item = (node.items || []).find(entry => entry.childId === childId);
+      if (item) {
+        return {
+          kind: 'grid-item',
+          gridId: node.id,
+          itemId: item.itemId,
+        };
+      }
+    }
+  }
+
+  return null;
+}
+
+export const useSpecStore = defineStore('spec', () => {
+  const currentSpec = ref<Spec | null>(null);
+  const selectedId = ref<NodeId | null>(null);
+  const clipboard = ref<Node | null>(null);
+  const recentPicks = ref<string[]>([]);
+  const specs = ref<SpecSummary[]>([]);
+  const settings = ref<SpecEditorSettings>({
+    includeGeometry: false,
+    autoDowngrade: true,
+    promptMode: 'long',
   });
 
-  const pageCount = computed(() => pages.value.length);
+  const hasSpecs = computed(() => specs.value.length > 0);
 
-  // ============================================================================
-  // Actions - Page CRUD
-  // ============================================================================
+  const selectedNode = computed(() => {
+    if (!currentSpec.value || !selectedId.value) return null;
+    return currentSpec.value.nodes[selectedId.value] || null;
+  });
 
-  function createPage(name: string = '新页面'): PageSpec {
-    const now = Date.now();
-    const page: PageSpec = {
-      id: nanoid(8),
-      name,
-      root: {
-        id: nanoid(8),
-        type: 'PageRoot',
-        title: name,
-        children: [],
-      },
-      recipes: [],
-      dialogs: [],
-      drawers: [],
-      createdAt: now,
-      updatedAt: now,
-    };
+  const selectedPath = computed(() => {
+    if (!currentSpec.value || !selectedId.value) return [];
+    return findPath(currentSpec.value, selectedId.value);
+  });
 
-    pages.value.push(page);
-    activePageId.value = page.id;
-    return page;
-  }
+  const selectedSlotHostId = computed(() => {
+    if (!currentSpec.value || !selectedId.value) return null;
 
-  function deletePage(pageId: string): void {
-    const index = pages.value.findIndex(p => p.id === pageId);
-    if (index !== -1) {
-      pages.value.splice(index, 1);
-      if (activePageId.value === pageId) {
-        activePageId.value = pages.value[0]?.id || null;
+    const selected = currentSpec.value.nodes[selectedId.value];
+    if (selected && isContainer(selected) && isSlotHost(selected)) {
+      return selected.id;
+    }
+
+    const path = selectedPath.value;
+    for (let i = path.length - 2; i >= 0; i -= 1) {
+      const node = currentSpec.value.nodes[path[i]];
+      if (node && isContainer(node) && isSlotHost(node)) {
+        return node.id;
       }
     }
-  }
 
-  function setActivePage(pageId: string): void {
-    activePageId.value = pageId;
-  }
-
-  function updatePage(pageId: string, updates: Partial<PageSpec>): void {
-    const page = pages.value.find(p => p.id === pageId);
-    if (page) {
-      Object.assign(page, updates, { updatedAt: Date.now() });
-    }
-  }
-
-  function duplicatePage(pageId: string): PageSpec | null {
-    const source = pages.value.find(p => p.id === pageId);
-    if (!source) return null;
-
-    const now = Date.now();
-    const newPage: PageSpec = {
-      ...JSON.parse(JSON.stringify(source)),
-      id: nanoid(8),
-      name: `${source.name} (副本)`,
-      createdAt: now,
-      updatedAt: now,
-    };
-
-    // 重新生成所有节点 ID
-    regenerateIds(newPage.root as unknown as LayoutNode);
-    newPage.recipes = [];
-    newPage.dialogs = [];
-    newPage.drawers = [];
-
-    pages.value.push(newPage);
-    return newPage;
-  }
-
-  // ============================================================================
-  // Actions - Node Operations
-  // ============================================================================
-
-  function findNode(root: LayoutNode, nodeId: string): LayoutNode | null {
-    if (root.id === nodeId) return root;
-
-    if ('children' in root && Array.isArray(root.children)) {
-      for (const child of root.children) {
-        const found = findNode(child, nodeId);
-        if (found) return found;
-      }
-    }
     return null;
+  });
+
+  function persistCurrent(): void {
+    if (!currentSpec.value) return;
+    saveSpec(currentSpec.value);
+    specs.value = listSpecs();
   }
 
-  function findParent(root: LayoutNode, nodeId: string): { parent: LayoutNode; index: number } | null {
-    if ('children' in root && Array.isArray(root.children)) {
-      for (let i = 0; i < root.children.length; i++) {
-        if (root.children[i].id === nodeId) {
-          return { parent: root, index: i };
-        }
-        const found = findParent(root.children[i], nodeId);
-        if (found) return found;
+  function initialize(): void {
+    specs.value = listSpecs();
+    if (specs.value.length > 0) {
+      const latest = loadSpec(specs.value[0].id);
+      if (latest) {
+        currentSpec.value = latest;
+        selectedId.value = latest.rootId;
       }
     }
-    return null;
   }
 
-  function addNode(
-    pageId: string,
-    parentId: string,
-    nodeType: LayoutNode['type'],
-    index?: number,
-  ): LayoutNode | null {
-    const page = pages.value.find(p => p.id === pageId);
-    if (!page) return null;
+  function createNewSpec(name: string = '新页面'): void {
+    const spec = createEmptySpec(name);
+    currentSpec.value = spec;
+    selectedId.value = spec.rootId;
+    persistCurrent();
+  }
 
-    const parent = findNode(page.root as unknown as LayoutNode, parentId);
-    if (!parent || !('children' in parent)) return null;
+  function select(nodeId: string | null): void {
+    selectedId.value = nodeId;
+  }
 
-    const newNode = createBlockNode(nodeType);
+  function addRecentPick(type: string): void {
+    recentPicks.value = [type, ...recentPicks.value.filter(item => item !== type)].slice(0, 12);
+  }
 
-    if (index !== undefined && index >= 0) {
-      parent.children.splice(index, 0, newNode);
-    } else {
-      parent.children.push(newNode);
+  function createNodeByPick(spec: Spec, pick: BlockPick): string {
+    addRecentPick(pick.type);
+
+    if (pick.kind === 'leaf') {
+      const type = pick.type as LeafType;
+      return createLeaf(spec, type, pick.componentRef ? { componentRef: pick.componentRef } : undefined);
     }
 
-    page.updatedAt = Date.now();
-    return newNode;
+    const type = pick.type as ContainerType;
+    return createContainer(spec, type);
   }
 
-  function updateNode(pageId: string, nodeId: string, updates: Partial<LayoutNode>): void {
-    const page = pages.value.find(p => p.id === pageId);
-    if (!page) return;
+  function addToSlot(hostId: string, pick: BlockPick, mode: AddMode = 'append'): string | null {
+    if (!currentSpec.value) return null;
+    const spec = currentSpec.value;
 
-    const node = findNode(page.root as unknown as LayoutNode, nodeId);
-    if (node) {
-      Object.assign(node, updates);
-      page.updatedAt = Date.now();
-    }
-  }
+    const host = getSlotHost(spec, hostId);
+    const newChildId = createNodeByPick(spec, pick);
 
-  function deleteNode(pageId: string, nodeId: string): void {
-    const page = pages.value.find(p => p.id === pageId);
-    if (!page) return;
-
-    const result = findParent(page.root as unknown as LayoutNode, nodeId);
-    if (result) {
-      result.parent.children.splice(result.index, 1);
-      page.updatedAt = Date.now();
-    }
-  }
-
-  // 别名，方便使用
-  const removeNode = deleteNode;
-
-  function insertAfterNode(pageId: string, targetNodeId: string, newNode: LayoutNode): void {
-    const page = pages.value.find(p => p.id === pageId);
-    if (!page) return;
-
-    const result = findParent(page.root as unknown as LayoutNode, targetNodeId);
-    if (result) {
-      result.parent.children.splice(result.index + 1, 0, newNode);
-      page.updatedAt = Date.now();
-    }
-  }
-
-  function moveNode(
-    pageId: string,
-    nodeId: string,
-    newParentId: string,
-    newIndex: number,
-  ): void {
-    const page = pages.value.find(p => p.id === pageId);
-    if (!page) return;
-
-    // 找到并移除节点
-    const result = findParent(page.root as unknown as LayoutNode, nodeId);
-    if (!result) return;
-
-    const [node] = result.parent.children.splice(result.index, 1);
-
-    // 添加到新位置
-    const newParent = findNode(page.root as unknown as LayoutNode, newParentId);
-    if (!newParent || !('children' in newParent)) {
-      // 恢复原位置
-      result.parent.children.splice(result.index, 0, node);
-      return;
+    if (!host.slot || host.slot.kind === 'empty') {
+      setSlotSingle(spec, hostId, newChildId);
+      selectedId.value = newChildId;
+      persistCurrent();
+      return newChildId;
     }
 
-    newParent.children.splice(newIndex, 0, node);
-    page.updatedAt = Date.now();
-  }
-
-  // ============================================================================
-  // Actions - Recipe Operations
-  // ============================================================================
-
-  function addRecipe(pageId: string, recipe: Recipe): void {
-    const page = pages.value.find(p => p.id === pageId);
-    if (page) {
-      page.recipes.push(recipe);
-      page.updatedAt = Date.now();
-    }
-  }
-
-  function updateRecipe(pageId: string, recipeId: string, updates: Partial<Recipe>): void {
-    const page = pages.value.find(p => p.id === pageId);
-    if (!page) return;
-
-    const recipe = page.recipes.find(r => r.id === recipeId);
-    if (recipe) {
-      Object.assign(recipe, updates);
-      page.updatedAt = Date.now();
-    }
-  }
-
-  function deleteRecipe(pageId: string, recipeId: string): void {
-    const page = pages.value.find(p => p.id === pageId);
-    if (!page) return;
-
-    const index = page.recipes.findIndex(r => r.id === recipeId);
-    if (index !== -1) {
-      page.recipes.splice(index, 1);
-      page.updatedAt = Date.now();
-    }
-  }
-
-  // ============================================================================
-  // Actions - Import/Export
-  // ============================================================================
-
-  function importPages(data: PageSpec[]): void {
-    for (const page of data) {
-      const existing = pages.value.find(p => p.id === page.id);
-      if (existing) {
-        Object.assign(existing, page);
+    if (host.slot.kind === 'single') {
+      if (mode === 'replace') {
+        const oldId = host.slot.childId;
+        replaceSingleChild(spec, hostId, newChildId);
+        deleteNodeCascade(spec, oldId);
       } else {
-        pages.value.push(page);
+        upgradeSlotToGrid(spec, hostId, newChildId);
+      }
+      selectedId.value = newChildId;
+      persistCurrent();
+      return newChildId;
+    }
+
+    if (host.slot.kind === 'grid') {
+      const grid = getGridContainer(spec, host.slot.gridId);
+      if (mode === 'replace' && (grid.items || []).length > 0) {
+        const first = grid.items![0];
+        replaceGridItemChild(spec, grid.id, first.itemId, newChildId);
+        deleteNodeCascade(spec, first.childId);
+      } else {
+        addGridItem(spec, grid.id, newChildId);
+      }
+      selectedId.value = newChildId;
+      persistCurrent();
+      return newChildId;
+    }
+
+    return null;
+  }
+
+  function replaceSelected(newType: string, componentRef?: string): string | null {
+    if (!currentSpec.value || !selectedId.value) return null;
+    const spec = currentSpec.value;
+
+    const oldId = selectedId.value;
+    const parentRef = findParentRef(spec, oldId);
+    if (!parentRef) return null;
+
+    let nextId: string;
+    if (isLeafType(newType)) {
+      nextId = createLeaf(spec, newType, componentRef ? { componentRef } : undefined);
+    } else if (isContainerType(newType) && newType !== 'grid') {
+      nextId = createContainer(spec, newType);
+    } else {
+      throw new Error(`unsupported replace type: ${newType}`);
+    }
+
+    if (parentRef.kind === 'slot-single' && parentRef.hostId) {
+      replaceSingleChild(spec, parentRef.hostId, nextId);
+    }
+
+    if (parentRef.kind === 'grid-item' && parentRef.gridId && parentRef.itemId) {
+      replaceGridItemChild(spec, parentRef.gridId, parentRef.itemId, nextId);
+    }
+
+    deleteNodeCascade(spec, oldId);
+    selectedId.value = nextId;
+    persistCurrent();
+    return nextId;
+  }
+
+  function removeSelected(): boolean {
+    if (!currentSpec.value || !selectedId.value) return false;
+    if (selectedId.value === currentSpec.value.rootId) return false;
+
+    const removed = deleteNodeCascade(currentSpec.value, selectedId.value);
+    selectedId.value = currentSpec.value.rootId;
+    if (removed) {
+      persistCurrent();
+    }
+    return removed;
+  }
+
+  function updateLeafMeta(nodeId: string, patch: Partial<LeafMeta>): void {
+    if (!currentSpec.value) return;
+    const node = getNode(currentSpec.value, nodeId);
+    if (!isLeaf(node)) return;
+
+    node.leafMeta = {
+      ...node.leafMeta,
+      ...(patch as any),
+      fields: {
+        ...(node.leafMeta.fields || {}),
+        ...((patch as any).fields || {}),
+      },
+      recipes: Array.isArray((patch as any).recipes)
+        ? [...((patch as any).recipes || [])]
+        : node.leafMeta.recipes,
+    };
+
+    currentSpec.value.meta.updatedAt = Date.now();
+    persistCurrent();
+  }
+
+  function updateLeafFields(nodeId: string, key: string, csv: string): void {
+    if (!currentSpec.value) return;
+    const node = getNode(currentSpec.value, nodeId);
+    if (!isLeaf(node)) return;
+
+    const values = csv
+      .split(',')
+      .map(item => item.trim())
+      .filter(Boolean);
+
+    node.leafMeta.fields = {
+      ...(node.leafMeta.fields || {}),
+      [key]: values,
+    };
+
+    currentSpec.value.meta.updatedAt = Date.now();
+    persistCurrent();
+  }
+
+  function updateContainerProps(nodeId: string, patch: Record<string, unknown>): void {
+    if (!currentSpec.value) return;
+    const node = getNode(currentSpec.value, nodeId);
+    if (!isContainer(node)) return;
+
+    node.props = {
+      ...node.props,
+      ...patch,
+    };
+
+    currentSpec.value.meta.updatedAt = Date.now();
+    persistCurrent();
+  }
+
+  function clearHostSlot(hostId: string): void {
+    if (!currentSpec.value) return;
+    clearSlot(currentSpec.value, hostId);
+    cleanupOrphans(currentSpec.value);
+    persistCurrent();
+  }
+
+  function removeGridItemById(gridId: string, itemId: string): boolean {
+    if (!currentSpec.value) return false;
+    const spec = currentSpec.value;
+    const removed = removeGridItem(spec, gridId, itemId);
+
+    if (!removed) return false;
+
+    if (settings.value.autoDowngrade) {
+      const host = findHostByGridId(spec, gridId);
+      if (host) {
+        downgradeGridToSingle(spec, host.id);
+      }
+    }
+
+    cleanupOrphans(spec);
+    persistCurrent();
+    return true;
+  }
+
+  function updateGridItemGeometry(
+    gridId: string,
+    itemId: string,
+    patch: Partial<{ x: number; y: number; w: number; h: number }>,
+  ): boolean {
+    if (!currentSpec.value) return false;
+    const changed = updateGridGeom(currentSpec.value, gridId, itemId, patch);
+    if (changed) {
+      persistCurrent();
+    }
+    return changed;
+  }
+
+  function duplicateCurrent(): void {
+    if (!currentSpec.value) return;
+    currentSpec.value = duplicateSpec(currentSpec.value);
+    selectedId.value = currentSpec.value.rootId;
+    persistCurrent();
+  }
+
+  function copySelected(): void {
+    if (!currentSpec.value || !selectedId.value) return;
+    clipboard.value = JSON.parse(JSON.stringify(currentSpec.value.nodes[selectedId.value] || null)) as Node | null;
+  }
+
+  function saveDraft(): void {
+    persistCurrent();
+  }
+
+  function loadDraft(id: string): void {
+    const spec = loadSpec(id);
+    if (!spec) return;
+    currentSpec.value = spec;
+    selectedId.value = spec.rootId;
+    specs.value = listSpecs();
+  }
+
+  function deleteDraft(id: string): void {
+    deleteSpec(id);
+    specs.value = listSpecs();
+    if (currentSpec.value?.meta.id === id) {
+      currentSpec.value = null;
+      selectedId.value = null;
+      if (specs.value.length > 0) {
+        loadDraft(specs.value[0].id);
       }
     }
   }
 
-  function exportPages(): PageSpec[] {
-    return JSON.parse(JSON.stringify(pages.value));
+  function setTemplate(id: string, value: boolean): void {
+    markTemplate(id, value);
+    specs.value = listSpecs();
   }
 
-  // ============================================================================
-  // Helpers
-  // ============================================================================
-
-  function regenerateIds(node: LayoutNode): void {
-    node.id = nanoid(8);
-    if ('children' in node && Array.isArray(node.children)) {
-      for (const child of node.children) {
-        regenerateIds(child);
-      }
+  function exportCurrent(): string {
+    if (!currentSpec.value) {
+      throw new Error('no current spec');
     }
+    return exportJSON(currentSpec.value);
   }
 
-  function loadFromStorage(): void {
-    try {
-      const stored = localStorage.getItem('pagespec-pages-v2');
-      if (stored) {
-        const data = JSON.parse(stored);
-        pages.value = data.pages || [];
-        activePageId.value = data.activePageId || null;
-      }
-      // 清理旧版本数据
-      localStorage.removeItem('pagespec-pages');
-    } catch (e) {
-      console.error('Failed to load pages from storage:', e);
-    }
+  function importFromJSON(raw: string): void {
+    const spec = importJSON(raw);
+    currentSpec.value = spec;
+    selectedId.value = spec.rootId;
+    persistCurrent();
   }
 
-  function saveToStorage(): void {
-    try {
-      localStorage.setItem('pagespec-pages-v2', JSON.stringify({
-        pages: pages.value,
-        activePageId: activePageId.value,
-      }));
-    } catch (e) {
-      console.error('Failed to save pages to storage:', e);
-    }
+  function setPromptMode(mode: PromptMode): void {
+    settings.value.promptMode = mode;
+  }
+
+  function setIncludeGeometry(value: boolean): void {
+    settings.value.includeGeometry = value;
+  }
+
+  function setAutoDowngrade(value: boolean): void {
+    settings.value.autoDowngrade = value;
   }
 
   return {
-    // State
-    pages,
-    activePageId,
-    // Getters
-    activePage,
-    pageCount,
-    // Actions
-    createPage,
-    deletePage,
-    setActivePage,
-    updatePage,
-    duplicatePage,
-    findNode,
-    addNode,
-    updateNode,
-    deleteNode,
-    removeNode,
-    insertAfterNode,
-    moveNode,
-    addRecipe,
-    updateRecipe,
-    deleteRecipe,
-    importPages,
-    exportPages,
-    loadFromStorage,
-    saveToStorage,
+    currentSpec,
+    selectedId,
+    selectedNode,
+    selectedPath,
+    selectedSlotHostId,
+    clipboard,
+    recentPicks,
+    specs,
+    hasSpecs,
+    settings,
+    initialize,
+    createNewSpec,
+    select,
+    addToSlot,
+    replaceSelected,
+    removeSelected,
+    updateLeafMeta,
+    updateLeafFields,
+    updateContainerProps,
+    clearHostSlot,
+    removeGridItemById,
+    updateGridItemGeometry,
+    duplicateCurrent,
+    copySelected,
+    saveDraft,
+    loadDraft,
+    deleteDraft,
+    setTemplate,
+    exportCurrent,
+    importFromJSON,
+    setPromptMode,
+    setIncludeGeometry,
+    setAutoDowngrade,
   };
 });

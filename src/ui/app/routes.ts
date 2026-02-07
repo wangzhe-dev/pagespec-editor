@@ -1,4 +1,4 @@
 export const appRoutes = {
-  library: '/library',
   designer: '/designer',
+  library: '/library',
 } as const;

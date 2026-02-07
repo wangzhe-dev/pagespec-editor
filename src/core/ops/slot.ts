@@ -1,42 +1,75 @@
-import type { LayoutNode } from '../model/types';
-import { hasChildren } from '../model/guards';
-import { createBlockNode } from './create';
+import { EMPTY_SLOT } from '../model/defaults';
+import type { Spec } from '../model/types';
+import { addGridItem } from './grid';
+import { createGridContainer } from './create';
+import { assertOrThrow, getGridContainer, getSlotHost, touch } from './internal';
 
-export function clearSlot(node: LayoutNode): boolean {
-  if (!hasChildren(node)) return false;
-  node.children.splice(0, node.children.length);
-  return true;
-}
-
-export function setSlotSingle(node: LayoutNode, child: LayoutNode): boolean {
-  if (!hasChildren(node)) return false;
-  node.children.splice(0, node.children.length, child);
-  return true;
-}
-
-export function upgradeSlotToGrid(node: LayoutNode) {
-  if (!hasChildren(node)) return null;
-  const grid = createBlockNode('Grid');
-  node.children.splice(0, node.children.length, grid);
-  return grid;
-}
-
-export function downgradeGridToSingle(node: LayoutNode, index: number = 0): LayoutNode | null {
-  if (!hasChildren(node) || node.children.length === 0) return null;
-
-  const first = node.children[index] as LayoutNode | undefined;
-  if (!first || first.type !== 'Grid' || !('children' in first) || !Array.isArray(first.children)) {
-    return null;
+export function setSlotSingle(spec: Spec, hostId: string, childId: string): void {
+  const host = getSlotHost(spec, hostId);
+  if (!spec.nodes[childId]) {
+    throw new Error(`child node not found: ${childId}`);
   }
 
-  const firstCell = first.children[0];
-  const firstLeaf =
-    firstCell && 'children' in firstCell && Array.isArray(firstCell.children)
-      ? firstCell.children[0]
-      : null;
+  host.slot = { kind: 'single', childId };
+  touch(spec);
+  assertOrThrow(spec, 'setSlotSingle');
+}
 
-  if (!firstLeaf) return null;
+export function clearSlot(spec: Spec, hostId: string): void {
+  const host = getSlotHost(spec, hostId);
+  host.slot = { ...EMPTY_SLOT };
+  touch(spec);
+  assertOrThrow(spec, 'clearSlot');
+}
 
-  node.children.splice(0, node.children.length, firstLeaf);
-  return firstLeaf;
+export function upgradeSlotToGrid(
+  spec: Spec,
+  hostId: string,
+  newChildId: string,
+  placement?: Partial<{ x: number; y: number; w: number; h: number }>,
+): string {
+  const host = getSlotHost(spec, hostId);
+  if (!host.slot || host.slot.kind !== 'single') {
+    throw new Error(`host slot is not single: ${hostId}`);
+  }
+
+  const oldChildId = host.slot.childId;
+  if (!spec.nodes[oldChildId] || !spec.nodes[newChildId]) {
+    throw new Error('upgradeSlotToGrid child not found');
+  }
+
+  const gridId = createGridContainer(spec);
+  addGridItem(spec, gridId, oldChildId, { x: 0, y: 0, w: 6, h: 6 });
+  addGridItem(spec, gridId, newChildId, placement);
+  host.slot = { kind: 'grid', gridId };
+
+  touch(spec);
+  assertOrThrow(spec, 'upgradeSlotToGrid');
+  return gridId;
+}
+
+export function downgradeGridToSingle(spec: Spec, hostId: string): boolean {
+  const host = getSlotHost(spec, hostId);
+  if (!host.slot || host.slot.kind !== 'grid') {
+    return false;
+  }
+
+  const gridId = host.slot.gridId;
+  const grid = getGridContainer(spec, gridId);
+  const items = grid.items || [];
+  if (items.length !== 1) {
+    return false;
+  }
+
+  const childId = items[0].childId;
+  if (!spec.nodes[childId]) {
+    return false;
+  }
+
+  host.slot = { kind: 'single', childId };
+  delete spec.nodes[gridId];
+
+  touch(spec);
+  assertOrThrow(spec, 'downgradeGridToSingle');
+  return true;
 }

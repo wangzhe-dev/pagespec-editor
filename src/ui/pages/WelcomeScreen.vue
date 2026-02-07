@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import { usePagesStore, useUIStore } from '@/core/store';
+import { useSpecStore, useUIStore } from '@/core/store';
 import { FileText, Zap, Code, Settings } from 'lucide-vue-next';
 
-const pagesStore = usePagesStore();
+const specStore = useSpecStore();
 const uiStore = useUIStore();
 
 function getStarted() {
-  pagesStore.createPage('示例页面');
+  specStore.createNewSpec('示例页面');
   uiStore.hideWelcome();
 }
 </script>

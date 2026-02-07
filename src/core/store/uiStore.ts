@@ -1,114 +1,25 @@
-/**
- * UI State Store
- * 界面状态管理
- */
-
-import type { PromptStyle } from '@/core/prompt/prompt.types';
 import { defineStore } from 'pinia';
-import { computed, ref } from 'vue';
+import { ref } from 'vue';
 
-export type PanelType = 'pages' | 'tree' | 'properties' | 'preview' | 'profile';
+export type ToastType = 'success' | 'error' | 'warning' | 'info';
+
+export interface ToastMessage {
+  id: string;
+  type: ToastType;
+  message: string;
+  duration?: number;
+}
 
 export const useUIStore = defineStore('ui', () => {
-  // ============================================================================
-  // State
-  // ============================================================================
-
-  // 选中的节点
-  const selectedNodeId = ref<string | null>(null);
-
-  // 悬停的节点（用于控制操作按钮显示）
-  const hoveredNodeId = ref<string | null>(null);
-
-  // 面板可见性
-  const panelVisibility = ref<Record<PanelType, boolean>>({
-    pages: true,
-    tree: true,
-    properties: true,
-    preview: true,
-    profile: false,
-  });
-
-  // 面板尺寸
-  const panelSizes = ref({
-    leftWidth: 280,
-    rightWidth: 320,
-    bottomHeight: 240,
-  });
-
-  // Prompt 编译配置
-  const promptStyle = ref<PromptStyle>({
-    length: 'medium',
-    language: 'zh',
-    strictness: 'strict',
-    includeDeliverables: true,
-    includeManifest: false,
-    skeletonMode: false,
-    diffMode: false,
-  });
-
-  // 属性面板模式
-  const propertyMode = ref<'basic' | 'advanced'>('basic');
-
-  // 主题
   const theme = ref<'light' | 'dark'>('dark');
-
-  // 是否展示欢迎页
   const showWelcome = ref(true);
+  const toasts = ref<ToastMessage[]>([]);
 
-  // Toast 消息
-  const toasts = ref<Array<{
-    id: string;
-    type: 'success' | 'error' | 'warning' | 'info';
-    message: string;
-    duration?: number;
-  }>>([]);
-
-  // ============================================================================
-  // Getters
-  // ============================================================================
-
-  const isPanelVisible = computed(() => (panel: PanelType) => panelVisibility.value[panel]);
-
-  // ============================================================================
-  // Actions
-  // ============================================================================
-
-  function selectNode(nodeId: string | null): void {
-    selectedNodeId.value = nodeId;
-  }
-
-  function hoverNode(nodeId: string | null): void {
-    hoveredNodeId.value = nodeId;
-  }
-
-  function togglePanel(panel: PanelType): void {
-    panelVisibility.value[panel] = !panelVisibility.value[panel];
-  }
-
-  function setPanelVisibility(panel: PanelType, visible: boolean): void {
-    panelVisibility.value[panel] = visible;
-  }
-
-  function setPanelSize(panel: 'left' | 'right' | 'bottom', size: number): void {
-    if (panel === 'left') panelSizes.value.leftWidth = size;
-    if (panel === 'right') panelSizes.value.rightWidth = size;
-    if (panel === 'bottom') panelSizes.value.bottomHeight = size;
-  }
-
-  function setPromptStyle(style: Partial<PromptStyle>): void {
-    Object.assign(promptStyle.value, style);
-  }
-
-  function setPropertyMode(mode: 'basic' | 'advanced'): void {
-    propertyMode.value = mode;
-  }
-
-  function setTheme(newTheme: 'light' | 'dark'): void {
-    theme.value = newTheme;
+  function setTheme(next: 'light' | 'dark') {
+    theme.value = next;
     const root = document.documentElement;
-    root.classList.toggle('light', newTheme === 'light');
-    root.classList.toggle('dark', newTheme === 'dark');
+    root.classList.toggle('light', next === 'light');
+    root.classList.toggle('dark', next === 'dark');
   }
 
   function hideWelcome(): void {
@@ -116,88 +27,57 @@ export const useUIStore = defineStore('ui', () => {
     localStorage.setItem('pagespec-welcome-shown', 'true');
   }
 
-  function showToast(
-    type: 'success' | 'error' | 'warning' | 'info',
-    message: string,
-    duration: number = 3000,
-  ): void {
-    const id = Math.random().toString(36).substr(2, 9);
+  function resetWelcome(): void {
+    showWelcome.value = true;
+    localStorage.removeItem('pagespec-welcome-shown');
+  }
+
+  function showToast(type: ToastType, message: string, duration: number = 3000): void {
+    const id = Math.random().toString(36).slice(2, 10);
     toasts.value.push({ id, type, message, duration });
 
     if (duration > 0) {
-      setTimeout(() => {
-        removeToast(id);
-      }, duration);
+      window.setTimeout(() => removeToast(id), duration);
     }
   }
 
   function removeToast(id: string): void {
-    const index = toasts.value.findIndex(t => t.id === id);
-    if (index !== -1) {
-      toasts.value.splice(index, 1);
+    const idx = toasts.value.findIndex(toast => toast.id === id);
+    if (idx >= 0) {
+      toasts.value.splice(idx, 1);
     }
   }
 
-  // ============================================================================
-  // Storage
-  // ============================================================================
-
   function loadFromStorage(): void {
     try {
-      const stored = localStorage.getItem('pagespec-ui');
-      if (stored) {
-        const data = JSON.parse(stored);
-        if (data.panelSizes) panelSizes.value = data.panelSizes;
-        if (data.panelVisibility) panelVisibility.value = data.panelVisibility;
-        if (data.promptStyle) promptStyle.value = data.promptStyle;
-        if (data.theme) setTheme(data.theme);
+      const storedTheme = localStorage.getItem('pagespec-theme') as 'light' | 'dark' | null;
+      if (storedTheme === 'light' || storedTheme === 'dark') {
+        setTheme(storedTheme);
       }
 
-      // 检查是否需要显示欢迎页
       if (localStorage.getItem('pagespec-welcome-shown') === 'true') {
         showWelcome.value = false;
       }
-    } catch (e) {
-      console.error('Failed to load UI state from storage:', e);
+    } catch {
+      // ignore
     }
   }
 
   function saveToStorage(): void {
     try {
-      localStorage.setItem('pagespec-ui', JSON.stringify({
-        panelSizes: panelSizes.value,
-        panelVisibility: panelVisibility.value,
-        promptStyle: promptStyle.value,
-        theme: theme.value,
-      }));
-    } catch (e) {
-      console.error('Failed to save UI state to storage:', e);
+      localStorage.setItem('pagespec-theme', theme.value);
+    } catch {
+      // ignore
     }
   }
 
   return {
-    // State
-    selectedNodeId,
-    hoveredNodeId,
-    panelVisibility,
-    panelSizes,
-    promptStyle,
-    propertyMode,
     theme,
     showWelcome,
     toasts,
-    // Getters
-    isPanelVisible,
-    // Actions
-    selectNode,
-    hoverNode,
-    togglePanel,
-    setPanelVisibility,
-    setPanelSize,
-    setPromptStyle,
-    setPropertyMode,
     setTheme,
     hideWelcome,
+    resetWelcome,
     showToast,
     removeToast,
     loadFromStorage,

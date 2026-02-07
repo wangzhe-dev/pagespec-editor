@@ -1,4 +1,20 @@
-export function formatSection(title: string, lines: string[]): string {
-  const body = lines.join('\n');
-  return [`【${title}】`, body].join('\n');
+import type { PromptSections } from './prompt.types';
+
+export function formatPromptSections(sections: PromptSections): string {
+  return [
+    '## Deliverables',
+    ...sections.deliverables,
+    '',
+    '## Hard Rules',
+    ...sections.hardRules,
+    '',
+    '## DSL',
+    ...sections.dsl,
+    '',
+    '## Leaf Details',
+    ...sections.leafDetails,
+    '',
+    '## Checklist',
+    ...sections.checklist,
+  ].join('\n');
 }

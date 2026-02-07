@@ -25,12 +25,12 @@ import PromptPreview from '@/ui/promptPreview/PromptPreview.vue';
 <style scoped>
 .designer-page {
   display: grid;
-  grid-template-columns: 280px 1fr 320px;
-  grid-template-rows: 1fr 220px;
+  grid-template-columns: 300px 1fr 340px;
+  grid-template-rows: 1fr 260px;
   grid-template-areas:
     'left main right'
     'bottom bottom bottom';
-  height: 100vh;
+  height: calc(100vh - 48px);
   gap: 8px;
   padding: 8px;
   background: var(--bg-base);
@@ -61,7 +61,7 @@ import PromptPreview from '@/ui/promptPreview/PromptPreview.vue';
   grid-area: bottom;
 }
 
-@media (max-width: 1200px) {
+@media (max-width: 1280px) {
   .designer-page {
     grid-template-columns: 1fr;
     grid-template-rows: auto auto auto auto;
@@ -71,7 +71,7 @@ import PromptPreview from '@/ui/promptPreview/PromptPreview.vue';
       'right'
       'bottom';
     height: auto;
-    min-height: 100vh;
+    min-height: calc(100vh - 48px);
   }
 }
 </style>

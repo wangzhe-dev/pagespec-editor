@@ -1,35 +1,35 @@
-import { hasChildren } from '../model/guards';
-import type { GridNode, LayoutNode } from '../model/types';
+import type { Spec } from '../model/types';
+import { assertOrThrow, getGridContainer, getSlotHost, touch } from './internal';
 
-export function replaceSingleChild(parent: LayoutNode, nextChild: LayoutNode): boolean {
-  if (!hasChildren(parent)) return false;
-  if (parent.children.length === 0) {
-    parent.children.push(nextChild);
-    return true;
+export function replaceSingleChild(spec: Spec, hostId: string, newChildId: string): void {
+  const host = getSlotHost(spec, hostId);
+  if (!spec.nodes[newChildId]) {
+    throw new Error(`new child node not found: ${newChildId}`);
   }
-  parent.children.splice(0, 1, nextChild);
-  return true;
+
+  host.slot = { kind: 'single', childId: newChildId };
+  touch(spec);
+  assertOrThrow(spec, 'replaceSingleChild');
 }
 
 export function replaceGridItemChild(
-  grid: GridNode,
-  cellId: string,
-  nextChild: LayoutNode,
+  spec: Spec,
+  gridId: string,
+  itemId: string,
+  newChildId: string,
 ): boolean {
-  if (!Array.isArray(grid.children)) return false;
-  const cell = grid.children.find(item => item.id === cellId);
-  if (!cell) return false;
-
-  if (!Array.isArray(cell.children)) {
-    cell.children = [nextChild];
-    return true;
+  if (!spec.nodes[newChildId]) {
+    throw new Error(`new child node not found: ${newChildId}`);
   }
 
-  if (cell.children.length === 0) {
-    cell.children.push(nextChild);
-    return true;
+  const grid = getGridContainer(spec, gridId);
+  const item = (grid.items || []).find(entry => entry.itemId === itemId);
+  if (!item) {
+    return false;
   }
 
-  cell.children.splice(0, 1, nextChild);
+  item.childId = newChildId;
+  touch(spec);
+  assertOrThrow(spec, 'replaceGridItemChild');
   return true;
 }
