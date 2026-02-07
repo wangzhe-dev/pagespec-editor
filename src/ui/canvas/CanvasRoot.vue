@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed } from 'vue';
 import { useSpecStore } from '@/core/store';
+import { computed } from 'vue';
 import NodeRenderer from './NodeRenderer.vue';
 
 const specStore = useSpecStore();
@@ -10,11 +10,6 @@ const rootId = computed(() => specStore.currentSpec?.rootId || null);
 
 <template>
   <section class="canvas-root">
-    <header class="canvas-header">
-      <h3>Canvas</h3>
-      <p v-if="specStore.currentSpec">{{ specStore.currentSpec.meta.name }}</p>
-    </header>
-
     <div v-if="!rootId" class="canvas-empty">暂无规格，先在左侧创建或从欢迎页开始。</div>
     <NodeRenderer v-else :node-id="rootId" />
   </section>

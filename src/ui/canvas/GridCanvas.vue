@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
-import { GridLayout, GridItem } from 'vue-grid-layout-v3';
-import { useSpecStore } from '@/core/store';
 import { isContainer } from '@/core/model/guards';
+import { useSpecStore } from '@/core/store';
+import { computed, ref } from 'vue';
+import { GridItem, GridLayout } from 'vue-grid-layout-v3';
 import NodeRenderer from './NodeRenderer.vue';
 
 const props = defineProps<{ gridId: string }>();
@@ -51,7 +51,7 @@ const rowHeight = computed(() => Number(gridNode.value?.props.rowHeight || 30));
 
 const draggable = ref(true);
 const resizable = ref(true);
-const responsive = ref(false);
+const responsive = ref(true);
 
 function childIdForItem(itemId: string): string {
   const item = items.value.find(i => i.itemId === itemId);
@@ -78,20 +78,6 @@ function onLayoutUpdated(newLayout: Array<{ i: string; x: number; y: number; w: 
   <div v-if="!gridNode" class="grid-fallback">Grid 节点不存在</div>
 
   <div v-else class="grid-canvas">
-    <div class="grid-controls">
-      <label><input type="checkbox" v-model="draggable" /> 可拖拽</label>
-      <label><input type="checkbox" v-model="resizable" /> 可缩放</label>
-      <label><input type="checkbox" v-model="responsive" /> 响应式</label>
-    </div>
-
-    <div class="grid-info">
-      <div class="columns">
-        <div v-for="item in layout" :key="item.i">
-          <b>{{ item.i }}</b>: [{{ item.x }}, {{ item.y }}, {{ item.w }}, {{ item.h }}]
-        </div>
-      </div>
-    </div>
-
     <GridLayout
       v-model:layout="layout"
       :col-num="colNum"
@@ -149,15 +135,7 @@ function onLayoutUpdated(newLayout: Array<{ i: string; x: number; y: number; w: 
   cursor: pointer;
 }
 
-.grid-info {
-  background: var(--bg-subtle);
-  border: 1px solid var(--border-subtle);
-  border-radius: 6px;
-  padding: 8px;
-  margin-bottom: 10px;
-  font-size: 12px;
-  color: var(--text-muted);
-}
+
 
 .columns {
   columns: 160px;

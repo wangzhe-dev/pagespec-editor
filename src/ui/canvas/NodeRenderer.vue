@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { computed } from 'vue';
-import { useSpecStore } from '@/core/store';
 import { isContainer, isLeaf, isSlotHost } from '@/core/model/guards';
-import SlotRenderer from './SlotRenderer.vue';
+import { useSpecStore } from '@/core/store';
+import { computed } from 'vue';
 import GridCanvas from './GridCanvas.vue';
+import SlotRenderer from './SlotRenderer.vue';
 
 const props = defineProps<{ nodeId: string }>();
 
@@ -38,7 +38,7 @@ function removeNode(): void {
 <template>
   <div v-if="!node" class="node-missing">节点不存在：{{ nodeId }}</div>
 
-  <article v-else-if="isLeaf(node)" class="leaf-shell" :class="{ selected: isSelected }" @click.stop="selectNode">
+  <!-- <article v-else-if="isLeaf(node)" class="leaf-shell" :class="{ selected: isSelected }" @click.stop="selectNode">
     <header class="leaf-header">
       <span class="leaf-type">{{ node.type }}</span>
       <code>{{ node.leafMeta.componentRef }}</code>
@@ -46,7 +46,7 @@ function removeNode(): void {
     </header>
     <p v-if="node.leafMeta.description" class="leaf-desc">{{ node.leafMeta.description }}</p>
     <p v-if="leafFieldSummary" class="leaf-fields">{{ leafFieldSummary }}</p>
-  </article>
+  </article> -->
 
   <section
     v-else-if="isContainer(node)"
@@ -57,7 +57,6 @@ function removeNode(): void {
     <header class="container-header">
       <div>
         <strong>{{ node.type }}</strong>
-        <span class="container-id">{{ node.id }}</span>
       </div>
       <button v-if="!isRoot" class="danger" @click.stop="removeNode">删除</button>
     </header>
