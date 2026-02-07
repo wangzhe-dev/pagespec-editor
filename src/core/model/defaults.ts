@@ -27,6 +27,7 @@ export const DEFAULT_LEAF_META: LeafMeta = {
 
 export const DEFAULT_CONTAINER_PROPS: Record<ContainerType, Record<string, unknown>> = {
   page: { title: '新页面' },
+  gridItem: { title: 'GridItem' },
   section: { title: 'Section' },
   card: { title: 'Card' },
   tabs: { title: 'Tabs', activeKey: 'tab-1' },
@@ -57,6 +58,7 @@ export const PALETTE_LEAVES: Array<{ type: PaletteLeafType; label: string }> = [
 ];
 
 export const PALETTE_CONTAINERS: Array<{ type: PaletteContainerType; label: string }> = [
+  { type: 'gridItem', label: 'GridItem' },
   { type: 'section', label: 'Section' },
   { type: 'card', label: 'Card' },
   { type: 'tabs', label: 'Tabs' },

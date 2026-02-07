@@ -1,16 +1,39 @@
 <script setup lang="ts">
+import { isContainer, isSlotHost } from '@/core/model/guards';
 import { useSpecStore } from '@/core/store';
-import { computed } from 'vue';
+import { computed, watch } from 'vue';
+import GridCanvas from './GridCanvas.vue';
 import NodeRenderer from './NodeRenderer.vue';
 
 const specStore = useSpecStore();
 
 const rootId = computed(() => specStore.currentSpec?.rootId || null);
+
+const rootGridId = computed(() => {
+  if (!rootId.value || !specStore.currentSpec) return null;
+  const root = specStore.currentSpec.nodes[rootId.value];
+  if (!root || !isContainer(root) || !isSlotHost(root)) return null;
+  return root.slot?.kind === 'grid' ? root.slot.gridId : null;
+});
+
+watch(
+  rootId,
+  nextRootId => {
+    if (!nextRootId || !specStore.currentSpec) return;
+    const root = specStore.currentSpec.nodes[nextRootId];
+    if (!root || !isContainer(root) || !isSlotHost(root)) return;
+    if (root.slot?.kind === 'empty') {
+      specStore.ensureContainerGrid(nextRootId);
+    }
+  },
+  { immediate: true },
+);
 </script>
 
 <template>
   <section class="canvas-root">
     <div v-if="!rootId" class="canvas-empty">暂无规格，先在左侧创建或从欢迎页开始。</div>
+    <GridCanvas v-else-if="rootGridId" :grid-id="rootGridId" />
     <NodeRenderer v-else :node-id="rootId" />
   </section>
 </template>

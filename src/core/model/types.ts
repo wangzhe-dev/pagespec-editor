@@ -7,6 +7,7 @@ export type NodeKind = 'container' | 'leaf';
 
 export type ContainerType =
   | 'page'
+  | 'gridItem'
   | 'section'
   | 'card'
   | 'tabs'

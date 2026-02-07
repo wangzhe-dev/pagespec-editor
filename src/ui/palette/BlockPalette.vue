@@ -30,6 +30,23 @@ const LAYOUT_PRESETS: LayoutPreset[] = [
     ],
   },
   {
+    name: 'top-2bottom',
+    label: '上+下2',
+    desc: '上方整行，下方左右两列',
+    items: [
+      { x: 0, y: 0, w: 12, h: 6 },
+      { x: 0, y: 6, w: 6, h: 6 },
+      { x: 6, y: 6, w: 6, h: 6 },
+    ],
+    previewCols: '1fr 1fr',
+    previewRows: '1fr 1fr',
+    preview: [
+      { col: '1 / 3', row: '1' },
+      { col: '1', row: '2' },
+      { col: '2', row: '2' },
+    ],
+  },
+  {
     name: 'top-mid-bottom',
     label: '上中下',
     desc: '三行平分',
@@ -93,23 +110,6 @@ const LAYOUT_PRESETS: LayoutPreset[] = [
     preview: [
       { col: '1', row: '1' },
       { col: '2', row: '1' },
-      { col: '1', row: '2' },
-      { col: '2', row: '2' },
-    ],
-  },
-  {
-    name: 'top-2bottom',
-    label: '上 + 下二',
-    desc: '上方整行，下方两列',
-    items: [
-      { x: 0, y: 0, w: 12, h: 6 },
-      { x: 0, y: 6, w: 6, h: 6 },
-      { x: 6, y: 6, w: 6, h: 6 },
-    ],
-    previewCols: '1fr 1fr',
-    previewRows: '1fr 1fr',
-    preview: [
-      { col: '1 / 3', row: '1' },
       { col: '1', row: '2' },
       { col: '2', row: '2' },
     ],

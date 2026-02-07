@@ -66,7 +66,41 @@ function isLeafType(type: string): type is LeafType {
 }
 
 function isContainerType(type: string): type is ContainerType {
-  return ['page', 'section', 'card', 'tabs', 'split', 'grid', 'dialog', 'drawer'].includes(type);
+  return ['page', 'gridItem', 'section', 'card', 'tabs', 'split', 'grid', 'dialog', 'drawer'].includes(type);
+}
+
+function ensureContainerGridInSpec(spec: Spec, containerId: string): void {
+  const node = spec.nodes[containerId];
+  if (!node || !isContainer(node) || node.type === 'grid') return;
+  if (!isSlotHost(node)) return;
+
+  if (node.slot?.kind === 'grid') return;
+
+  if (node.slot?.kind === 'single') {
+    const prevChildId = node.slot.childId;
+    const innerGridId = createGridContainer(spec);
+    addGridItem(spec, innerGridId, prevChildId, { x: 0, y: 0, w: 12, h: 6 });
+    attachToSlot(spec, containerId, { kind: 'grid', gridId: innerGridId });
+    return;
+  }
+
+  const innerGridId = createGridContainer(spec);
+  attachToSlot(spec, containerId, { kind: 'grid', gridId: innerGridId });
+}
+
+function normalizeSlotsToGrid(spec: Spec): boolean {
+  let changed = false;
+
+  for (const node of Object.values(spec.nodes)) {
+    if (!isContainer(node) || node.type === 'grid') continue;
+    if (!isSlotHost(node)) continue;
+    if (node.slot?.kind === 'grid') continue;
+
+    ensureContainerGridInSpec(spec, node.id);
+    changed = true;
+  }
+
+  return changed;
 }
 
 function sortedGridChildIds(node: Node): string[] {
@@ -203,6 +237,10 @@ export const useSpecStore = defineStore('spec', () => {
     if (specs.value.length > 0) {
       const latest = loadSpec(specs.value[0].id);
       if (latest) {
+        if (normalizeSlotsToGrid(latest)) {
+          saveSpec(latest);
+          specs.value = listSpecs();
+        }
         currentSpec.value = latest;
         selectedId.value = latest.rootId;
       }
@@ -240,7 +278,9 @@ export const useSpecStore = defineStore('spec', () => {
     }
 
     const type = pick.type as ContainerType;
-    return createContainer(spec, type);
+    const id = createContainer(spec, type);
+    ensureContainerGridInSpec(spec, id);
+    return id;
   }
 
   function addToSlot(hostId: string, pick: BlockPick, mode: AddMode = 'append'): string | null {
@@ -248,6 +288,10 @@ export const useSpecStore = defineStore('spec', () => {
     const spec = currentSpec.value;
 
     const host = getSlotHost(spec, hostId);
+    const forceGridHost = host.type === 'card' || host.type === 'gridItem';
+    if (forceGridHost) {
+      ensureContainerGridInSpec(spec, hostId);
+    }
     const newChildId = createNodeByPick(spec, pick);
 
     if (!host.slot || host.slot.kind === 'empty') {
@@ -300,6 +344,7 @@ export const useSpecStore = defineStore('spec', () => {
       nextId = createLeaf(spec, newType, componentRef ? { componentRef } : undefined);
     } else if (isContainerType(newType) && newType !== 'grid') {
       nextId = createContainer(spec, newType);
+      ensureContainerGridInSpec(spec, nextId);
     } else {
       throw new Error(`unsupported replace type: ${newType}`);
     }
@@ -400,7 +445,7 @@ export const useSpecStore = defineStore('spec', () => {
 
     if (settings.value.autoDowngrade) {
       const host = findHostByGridId(spec, gridId);
-      if (host) {
+      if (host && host.type !== 'card' && host.type !== 'gridItem') {
         downgradeGridToSingle(spec, host.id);
       }
     }
@@ -442,8 +487,12 @@ export const useSpecStore = defineStore('spec', () => {
   function loadDraft(id: string): void {
     const spec = loadSpec(id);
     if (!spec) return;
+    const changed = normalizeSlotsToGrid(spec);
     currentSpec.value = spec;
     selectedId.value = spec.rootId;
+    if (changed) {
+      saveSpec(spec);
+    }
     specs.value = listSpecs();
   }
 
@@ -473,6 +522,7 @@ export const useSpecStore = defineStore('spec', () => {
 
   function importFromJSON(raw: string): void {
     const spec = importJSON(raw);
+    normalizeSlotsToGrid(spec);
     currentSpec.value = spec;
     selectedId.value = spec.rootId;
     persistCurrent();
@@ -494,13 +544,7 @@ export const useSpecStore = defineStore('spec', () => {
   function ensureContainerGrid(containerId: string): void {
     if (!currentSpec.value) return;
     const spec = currentSpec.value;
-    const node = spec.nodes[containerId];
-    if (!node || !isContainer(node) || node.type === 'grid') return;
-    if (!isSlotHost(node)) return;
-    if (node.slot && node.slot.kind !== 'empty') return;
-
-    const innerGridId = createGridContainer(spec);
-    attachToSlot(spec, containerId, { kind: 'grid', gridId: innerGridId });
+    ensureContainerGridInSpec(spec, containerId);
     persistCurrent();
   }
 
@@ -518,11 +562,11 @@ export const useSpecStore = defineStore('spec', () => {
     // Create grid container and populate with preset items
     const gridId = createGridContainer(spec);
     for (const item of items) {
-      const cardId = createContainer(spec, 'card');
+      const gridItemId = createContainer(spec, 'gridItem');
       // Each container child gets its own internal grid
       const innerGridId = createGridContainer(spec);
-      attachToSlot(spec, cardId, { kind: 'grid', gridId: innerGridId });
-      addGridItem(spec, gridId, cardId, item);
+      attachToSlot(spec, gridItemId, { kind: 'grid', gridId: innerGridId });
+      addGridItem(spec, gridId, gridItemId, item);
     }
 
     // Attach grid to host slot

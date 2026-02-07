@@ -1,11 +1,21 @@
 <script setup lang="ts">
 import { isContainer } from '@/core/model/guards';
 import { useSpecStore } from '@/core/store';
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { GridItem, GridLayout } from 'vue-grid-layout-v3';
 import GridItemShell from './GridItemShell.vue';
 
 const MIN_W = 2;
+const BREAKPOINTS = { lg: 1200, md: 996, sm: 768, xs: 480, xxs: 0 } as const;
+type Breakpoint = keyof typeof BREAKPOINTS;
+interface LayoutEntry {
+  i: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  minW?: number;
+}
 
 const props = defineProps<{ gridId: string }>();
 
@@ -26,42 +36,153 @@ const items = computed(() => {
   });
 });
 
-const layout = computed({
-  get() {
-    return items.value.map(item => ({
-      i: item.itemId,
-      x: item.x,
-      y: item.y,
-      w: item.w,
-      h: item.h,
-      minW: item.minW ?? MIN_W,
-    }));
-  },
-  set(newLayout: Array<{ i: string; x: number; y: number; w: number; h: number }>) {
-    for (const entry of newLayout) {
-      specStore.updateGridItemGeometry(props.gridId, entry.i, {
-        x: entry.x,
-        y: entry.y,
-        w: entry.w,
-        h: entry.h,
-      });
-    }
-  },
-});
-
 const colNum = computed(() => Number(gridNode.value?.props.colNum || 12));
 const rowHeight = computed(() => Number(gridNode.value?.props.rowHeight || 30));
+const cols = computed<Record<Breakpoint, number>>(() => {
+  const lg = Math.max(1, colNum.value);
+  return {
+    lg,
+    md: Math.max(1, Math.min(lg, 10)),
+    sm: Math.max(1, Math.min(lg, 6)),
+    xs: Math.max(1, Math.min(lg, 4)),
+    xxs: Math.max(1, Math.min(lg, 2)),
+  };
+});
 
 const draggable = ref(true);
 const resizable = ref(true);
 const responsive = ref(true);
+const activeBreakpoint = ref<Breakpoint>('lg');
+const layoutModel = ref<LayoutEntry[]>([]);
+const responsiveLayouts = ref<Record<Breakpoint, LayoutEntry[]>>({
+  lg: [],
+  md: [],
+  sm: [],
+  xs: [],
+  xxs: [],
+});
+
+const layoutBlueprint = computed<LayoutEntry[]>(() => {
+  // Geometry-only snapshot:
+  // changing child type/childId should not rebuild responsive layouts.
+  return items.value.map(item => ({
+    i: item.itemId,
+    x: item.x,
+    y: item.y,
+    w: item.w,
+    h: item.h,
+    minW: item.minW ?? MIN_W,
+  }));
+});
+
+function cloneLayout(layout: LayoutEntry[]): LayoutEntry[] {
+  return layout.map(item => ({ ...item }));
+}
+
+function collides(a: Pick<LayoutEntry, 'x' | 'y' | 'w' | 'h'>, b: Pick<LayoutEntry, 'x' | 'y' | 'w' | 'h'>): boolean {
+  return !(
+    a.x + a.w <= b.x ||
+    b.x + b.w <= a.x ||
+    a.y + a.h <= b.y ||
+    b.y + b.h <= a.y
+  );
+}
+
+function isBreakpoint(value: string): value is Breakpoint {
+  return Object.prototype.hasOwnProperty.call(BREAKPOINTS, value);
+}
+
+function scaleLayout(
+  source: LayoutEntry[],
+  fromCols: number,
+  toCols: number,
+): LayoutEntry[] {
+  if (fromCols === toCols) return cloneLayout(source);
+
+  const sorted = cloneLayout(source).sort((a, b) => {
+    if (a.y !== b.y) return a.y - b.y;
+    if (a.x !== b.x) return a.x - b.x;
+    return a.i.localeCompare(b.i);
+  });
+
+  const placed: LayoutEntry[] = [];
+
+  for (const item of sorted) {
+    const scaledMinW = item.minW
+      ? Math.max(1, Math.min(toCols, Math.round((item.minW / fromCols) * toCols)))
+      : undefined;
+    const w = Math.max(
+      scaledMinW ?? 1,
+      Math.min(
+        toCols,
+        Math.round((item.w / fromCols) * toCols),
+      ),
+    );
+    const h = Math.max(1, item.h);
+
+    let x = Math.round((item.x / fromCols) * toCols);
+    x = Math.max(0, Math.min(toCols - w, x));
+    let y = Math.max(0, item.y);
+
+    const candidate: LayoutEntry = {
+      ...item,
+      x,
+      y,
+      w,
+      h,
+      minW: scaledMinW,
+    };
+
+    while (placed.some(entry => collides(candidate, entry))) {
+      x += 1;
+      if (x + w > toCols) {
+        x = 0;
+        y += 1;
+      }
+      candidate.x = x;
+      candidate.y = y;
+    }
+
+    placed.push(candidate);
+  }
+
+  return placed;
+}
+
+function rebuildResponsiveLayouts(): void {
+  const lgLayout = layoutBlueprint.value;
+
+  const nextLayouts: Record<Breakpoint, LayoutEntry[]> = {
+    lg: cloneLayout(lgLayout),
+    md: scaleLayout(lgLayout, cols.value.lg, cols.value.md),
+    sm: scaleLayout(lgLayout, cols.value.lg, cols.value.sm),
+    xs: scaleLayout(lgLayout, cols.value.lg, cols.value.xs),
+    xxs: scaleLayout(lgLayout, cols.value.lg, cols.value.xxs),
+  };
+
+  responsiveLayouts.value = nextLayouts;
+  layoutModel.value = cloneLayout(nextLayouts[activeBreakpoint.value] || nextLayouts.lg);
+}
+
+watch([layoutBlueprint, cols], () => {
+  rebuildResponsiveLayouts();
+}, { immediate: true });
 
 function childIdForItem(itemId: string): string {
   const item = items.value.find(i => i.itemId === itemId);
   return item?.childId ?? '';
 }
 
-function onLayoutUpdated(newLayout: Array<{ i: string; x: number; y: number; w: number; h: number }>) {
+function onLayoutUpdated(newLayout: Array<{ i: string; x: number; y: number; w: number; h: number; minW?: number }>) {
+  layoutModel.value = cloneLayout(newLayout);
+  responsiveLayouts.value = {
+    ...responsiveLayouts.value,
+    [activeBreakpoint.value]: cloneLayout(newLayout),
+  };
+
+  // Persist schema geometry with lg as source of truth.
+  if (activeBreakpoint.value !== 'lg') return;
+
   for (const entry of newLayout) {
     specStore.updateGridItemGeometry(props.gridId, entry.i, {
       x: entry.x,
@@ -77,6 +198,8 @@ function onLayoutUpdated(newLayout: Array<{ i: string; x: number; y: number; w: 
  * in the same row (overlapping Y range) to fill the remaining columns.
  */
 function onItemResized(i: string, newH: number, newW: number) {
+  if (activeBreakpoint.value !== 'lg') return;
+
   const allItems = items.value;
   const resized = allItems.find(item => item.itemId === i);
   if (!resized) return;
@@ -123,6 +246,12 @@ function onItemResized(i: string, newH: number, newW: number) {
     curX += w;
   }
 }
+
+function onBreakpointChanged(newBreakpoint: string, newLayout: LayoutEntry[]) {
+  if (!isBreakpoint(newBreakpoint)) return;
+  activeBreakpoint.value = newBreakpoint;
+  layoutModel.value = cloneLayout(newLayout);
+}
 </script>
 
 <template>
@@ -130,8 +259,11 @@ function onItemResized(i: string, newH: number, newW: number) {
 
   <div v-else class="grid-canvas">
     <GridLayout
-      v-model:layout="layout"
+      v-model:layout="layoutModel"
+      :responsive-layouts="responsiveLayouts"
       :col-num="colNum"
+      :breakpoints="BREAKPOINTS"
+      :cols="cols"
       :row-height="rowHeight"
       :is-draggable="draggable"
       :is-resizable="resizable"
@@ -139,9 +271,10 @@ function onItemResized(i: string, newH: number, newW: number) {
       :vertical-compact="true"
       :use-css-transforms="true"
       @layout-updated="onLayoutUpdated"
+      @breakpoint-changed="onBreakpointChanged"
     >
       <GridItem
-        v-for="item in layout"
+        v-for="item in layoutModel"
         :key="item.i"
         :x="item.x"
         :y="item.y"
@@ -163,8 +296,8 @@ function onItemResized(i: string, newH: number, newW: number) {
 
 <style scoped>
 .grid-canvas {
-  border: 1px dashed var(--border-subtle);
-  border-radius: 8px;
+  /* border: 1px dashed var(--border-subtle);
+  border-radius: 8px; */
   padding: 8px;
   background: var(--bg-base);
 }
@@ -172,7 +305,7 @@ function onItemResized(i: string, newH: number, newW: number) {
 :deep(.vue-grid-layout) {
   background: var(--bg-subtle);
   border-radius: 8px;
-  min-height: 100px;
+  min-height: 180px;
 }
 
 :deep(.vue-grid-item:not(.vue-grid-placeholder)) {

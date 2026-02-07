@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, defineAsyncComponent } from 'vue';
+import { computed, defineAsyncComponent, watch } from 'vue';
 import { useSpecStore } from '@/core/store';
 import { isContainer, isLeaf, isSlotHost } from '@/core/model/guards';
 import { PALETTE_CONTAINERS, PALETTE_LEAVES } from '@/core/model/defaults';
@@ -29,6 +29,16 @@ const childType = computed(() => childNode.value?.type || '');
 
 const canAddSubItems = computed(() => isSlotHostChild.value || isLeafChild.value);
 
+watch(
+  childNode,
+  node => {
+    if (!node || !isContainer(node) || !isSlotHost(node)) return;
+    if (node.slot?.kind === 'grid') return;
+    specStore.ensureContainerGrid(node.id);
+  },
+  { immediate: true },
+);
+
 function onTypeChange(event: Event) {
   const newType = (event.target as HTMLSelectElement).value;
   if (!newType || newType === childType.value) return;
@@ -46,19 +56,19 @@ function addSubItem() {
   if (!specStore.currentSpec) return;
 
   if (isLeafChild.value) {
-    // Convert leaf → card container with internal grid, then add item
+    // Convert leaf → gridItem container with internal grid, then add item
     specStore.select(props.childId);
-    const newContainerId = specStore.replaceSelected('card');
+    const newContainerId = specStore.replaceSelected('gridItem');
     if (!newContainerId) return;
     specStore.ensureContainerGrid(newContainerId);
-    specStore.addToSlot(newContainerId, { kind: 'leaf', type: 'table' }, 'append');
+    specStore.addToSlot(newContainerId, { kind: 'container', type: 'gridItem' }, 'append');
     return;
   }
 
   if (isSlotHostChild.value) {
     // Ensure internal grid exists before adding
     specStore.ensureContainerGrid(props.childId);
-    specStore.addToSlot(props.childId, { kind: 'leaf', type: 'table' }, 'append');
+    specStore.addToSlot(props.childId, { kind: 'container', type: 'gridItem' }, 'append');
   }
 }
 

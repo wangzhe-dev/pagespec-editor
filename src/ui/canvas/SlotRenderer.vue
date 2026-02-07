@@ -16,8 +16,8 @@ const host = computed(() => {
   return node;
 });
 
-function quickAddLeaf(mode: 'append' | 'replace'): void {
-  specStore.addToSlot(props.hostId, { kind: 'leaf', type: 'table' }, mode);
+function quickAddGridItem(mode: 'append' | 'replace'): void {
+  specStore.addToSlot(props.hostId, { kind: 'container', type: 'gridItem' }, mode);
 }
 
 function quickAddContainer(mode: 'append' | 'replace'): void {
@@ -36,15 +36,15 @@ function clearCurrentSlot(): void {
     <div v-if="host.slot?.kind === 'empty'" class="slot-empty">
       <p>Empty Slot</p>
       <div class="slot-actions">
-        <button @click.stop="quickAddLeaf('append')">+ Table</button>
+        <button @click.stop="quickAddGridItem('append')">+ GridItem</button>
         <button @click.stop="quickAddContainer('append')">+ Card</button>
       </div>
     </div>
 
     <div v-else-if="host.slot?.kind === 'single'" class="slot-single">
       <div class="slot-toolbar">
-        <button @click.stop="quickAddLeaf('append')">追加 -> 升级Grid</button>
-        <button @click.stop="quickAddLeaf('replace')">替换为Table</button>
+        <button @click.stop="quickAddGridItem('append')">追加 -> 升级Grid</button>
+        <button @click.stop="quickAddGridItem('replace')">替换为GridItem</button>
         <button @click.stop="clearCurrentSlot">清空</button>
       </div>
       <NodeRenderer :node-id="host.slot.childId" />
@@ -52,7 +52,7 @@ function clearCurrentSlot(): void {
 
     <div v-else-if="host.slot?.kind === 'grid'" class="slot-grid">
       <div class="slot-toolbar">
-        <button @click.stop="quickAddLeaf('append')">+ Grid Item</button>
+        <button @click.stop="quickAddGridItem('append')">+ GridItem</button>
         <button @click.stop="clearCurrentSlot">清空</button>
       </div>
       <GridCanvas :grid-id="host.slot.gridId" />

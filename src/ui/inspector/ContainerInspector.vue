@@ -33,9 +33,9 @@ function clearCurrentSlot() {
   specStore.clearHostSlot(node.value.id);
 }
 
-function addQuickLeaf(mode: 'append' | 'replace') {
+function addQuickGridItem(mode: 'append' | 'replace') {
   if (!node.value || !isSlotHost(node.value)) return;
-  specStore.addToSlot(node.value.id, { kind: 'leaf', type: 'table' }, mode);
+  specStore.addToSlot(node.value.id, { kind: 'container', type: 'gridItem' }, mode);
 }
 </script>
 
@@ -54,8 +54,8 @@ function addQuickLeaf(mode: 'append' | 'replace') {
     </label>
 
     <div v-if="isSlotHost(node)" class="slot-actions">
-      <button @click="addQuickLeaf('append')">追加 Table</button>
-      <button @click="addQuickLeaf('replace')">替换为 Table</button>
+      <button @click="addQuickGridItem('append')">追加 GridItem</button>
+      <button @click="addQuickGridItem('replace')">替换为 GridItem</button>
       <button @click="clearCurrentSlot">清空 Slot</button>
     </div>
   </section>

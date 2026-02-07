@@ -2,6 +2,7 @@ import type { ContainerNode, LeafNode, Node, NodeId, SlotContent, Spec } from '.
 
 const SLOT_HOST_TYPES = new Set<ContainerNode['type']>([
   'page',
+  'gridItem',
   'section',
   'card',
   'tabs',

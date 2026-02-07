@@ -1,5 +1,7 @@
 import { isContainer, isSlotHost } from '../model/guards';
-import type { NodeId, Spec } from '../model/types';
+import { DEFAULT_GRID_CONFIG } from '../model/defaults';
+import { createGridItemId, createNodeId, deepClone } from '../model/id';
+import type { ContainerNode, NodeId, Spec } from '../model/types';
 import { assertOrThrow, touch } from './internal';
 
 function collectDescendants(spec: Spec, nodeId: NodeId, set: Set<NodeId>) {
@@ -46,6 +48,48 @@ function removeAllReferences(spec: Spec, deleted: Set<NodeId>) {
   }
 }
 
+function createGridNode(spec: Spec): ContainerNode {
+  const id = createNodeId();
+  const grid: ContainerNode = {
+    id,
+    kind: 'container',
+    type: 'grid',
+    props: {
+      ...deepClone(DEFAULT_GRID_CONFIG),
+    },
+    items: [],
+  };
+  spec.nodes[id] = grid;
+  return grid;
+}
+
+function ensureHostSlotGrid(spec: Spec, host: ContainerNode): ContainerNode {
+  const slot = host.slot;
+  if (slot?.kind === 'grid') {
+    const grid = spec.nodes[slot.gridId];
+    if (grid && isContainer(grid) && grid.type === 'grid') {
+      return grid;
+    }
+  }
+
+  const grid = createGridNode(spec);
+  if (slot?.kind === 'single' && spec.nodes[slot.childId]) {
+    grid.items = [
+      {
+        itemId: createGridItemId(),
+        childId: slot.childId,
+        x: 0,
+        y: 0,
+        w: 12,
+        h: 6,
+      },
+    ];
+  }
+
+  host.slot = { kind: 'grid', gridId: grid.id };
+  return grid;
+}
+
 function collectReachable(spec: Spec, nodeId: NodeId, seen: Set<NodeId>) {
   if (seen.has(nodeId)) return;
   const node = spec.nodes[nodeId];
@@ -74,28 +118,9 @@ export function cleanupOrphans(spec: Spec): void {
   for (const node of Object.values(spec.nodes)) {
     if (!isContainer(node)) continue;
 
-    if (isSlotHost(node) && node.slot) {
-      if (node.slot.kind === 'single' && !spec.nodes[node.slot.childId]) {
-        node.slot = { kind: 'empty' };
-      }
-
-      if (node.slot.kind === 'grid') {
-        const grid = spec.nodes[node.slot.gridId];
-        if (!grid || !isContainer(grid) || grid.type !== 'grid') {
-          node.slot = { kind: 'empty' };
-          continue;
-        }
-
-        grid.items = (grid.items || []).filter(item => Boolean(spec.nodes[item.childId]));
-
-        if (grid.items.length === 0) {
-          node.slot = { kind: 'empty' };
-          delete spec.nodes[grid.id];
-        } else if (grid.items.length === 1) {
-          node.slot = { kind: 'single', childId: grid.items[0].childId };
-          delete spec.nodes[grid.id];
-        }
-      }
+    if (isSlotHost(node)) {
+      const grid = ensureHostSlotGrid(spec, node);
+      grid.items = (grid.items || []).filter(item => Boolean(spec.nodes[item.childId]));
     }
 
     if (node.type === 'grid') {

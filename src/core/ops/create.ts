@@ -22,6 +22,7 @@ function createMeta(name: string) {
 
 export function createEmptySpec(name: string = 'Untitled Spec'): Spec {
   const rootId = createNodeId();
+  const rootGridId = createNodeId();
   const spec: Spec = {
     version: 1,
     rootId,
@@ -31,7 +32,16 @@ export function createEmptySpec(name: string = 'Untitled Spec'): Spec {
         kind: 'container',
         type: 'page',
         props: deepClone(DEFAULT_CONTAINER_PROPS.page),
-        slot: deepClone(EMPTY_SLOT),
+        slot: { kind: 'grid', gridId: rootGridId },
+      },
+      [rootGridId]: {
+        id: rootGridId,
+        kind: 'container',
+        type: 'grid',
+        props: {
+          ...deepClone(DEFAULT_GRID_CONFIG),
+        },
+        items: [],
       },
     },
     meta: createMeta(name),
