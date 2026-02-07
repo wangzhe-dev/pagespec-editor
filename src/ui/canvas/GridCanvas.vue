@@ -1,11 +1,14 @@
 <script setup lang="ts">
 import { isContainer } from '@/core/model/guards';
 import { useSpecStore } from '@/core/store';
-import { computed, ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { GridItem, GridLayout } from 'vue-grid-layout-v3';
 import GridItemShell from './GridItemShell.vue';
 
 const MIN_W = 2;
+const DEFAULT_ROWS = 12;
+const DEFAULT_MARGIN: [number, number] = [8, 8];
+const CANVAS_PADDING_Y = 16;
 const BREAKPOINTS = { lg: 1200, md: 996, sm: 768, xs: 480, xxs: 0 } as const;
 type Breakpoint = keyof typeof BREAKPOINTS;
 interface LayoutEntry {
@@ -37,7 +40,16 @@ const items = computed(() => {
 });
 
 const colNum = computed(() => Number(gridNode.value?.props.colNum || 12));
-const rowHeight = computed(() => Number(gridNode.value?.props.rowHeight || 30));
+const configuredRowHeight = computed(() => Number(gridNode.value?.props.rowHeight || 30));
+const margin = computed<[number, number]>(() => {
+  const raw = gridNode.value?.props.margin;
+  if (!Array.isArray(raw) || raw.length !== 2) return DEFAULT_MARGIN;
+
+  const marginX = Number(raw[0]);
+  const marginY = Number(raw[1]);
+  if (!Number.isFinite(marginX) || !Number.isFinite(marginY)) return DEFAULT_MARGIN;
+  return [Math.max(0, marginX), Math.max(0, marginY)];
+});
 const cols = computed<Record<Breakpoint, number>>(() => {
   const lg = Math.max(1, colNum.value);
   return {
@@ -60,6 +72,54 @@ const responsiveLayouts = ref<Record<Breakpoint, LayoutEntry[]>>({
   sm: [],
   xs: [],
   xxs: [],
+});
+const canvasEl = ref<HTMLElement | null>(null);
+const canvasHeight = ref(0);
+
+const occupiedRows = computed(() => {
+  const maxRow = items.value.reduce((acc, item) => Math.max(acc, item.y + item.h), 0);
+  return Math.max(DEFAULT_ROWS, maxRow);
+});
+
+const renderRowHeight = computed(() => {
+  if (canvasHeight.value <= 0) return configuredRowHeight.value;
+
+  const rows = occupiedRows.value;
+  const usableHeight = canvasHeight.value - CANVAS_PADDING_Y - margin.value[1] * Math.max(0, rows - 1);
+  if (usableHeight <= 0) return configuredRowHeight.value;
+
+  return Math.max(12, Math.floor(usableHeight / rows));
+});
+
+let resizeObserver: ResizeObserver | null = null;
+
+function updateCanvasHeight(): void {
+  canvasHeight.value = canvasEl.value?.clientHeight || 0;
+}
+
+onMounted(() => {
+  if (typeof ResizeObserver !== 'undefined') {
+    resizeObserver = new ResizeObserver(() => updateCanvasHeight());
+    if (canvasEl.value) {
+      resizeObserver.observe(canvasEl.value);
+    }
+  }
+  nextTick(updateCanvasHeight);
+});
+
+onBeforeUnmount(() => {
+  resizeObserver?.disconnect();
+  resizeObserver = null;
+});
+
+watch(canvasEl, (next, prev) => {
+  if (resizeObserver && prev) {
+    resizeObserver.unobserve(prev);
+  }
+  if (resizeObserver && next) {
+    resizeObserver.observe(next);
+  }
+  nextTick(updateCanvasHeight);
 });
 
 const layoutBlueprint = computed<LayoutEntry[]>(() => {
@@ -257,14 +317,15 @@ function onBreakpointChanged(newBreakpoint: string, newLayout: LayoutEntry[]) {
 <template>
   <div v-if="!gridNode" class="grid-fallback">Grid 节点不存在</div>
 
-  <div v-else class="grid-canvas">
+  <div v-else ref="canvasEl" class="grid-canvas">
     <GridLayout
       v-model:layout="layoutModel"
       :responsive-layouts="responsiveLayouts"
       :col-num="colNum"
       :breakpoints="BREAKPOINTS"
       :cols="cols"
-      :row-height="rowHeight"
+      :margin="margin"
+      :row-height="renderRowHeight"
       :is-draggable="draggable"
       :is-resizable="resizable"
       :responsive="responsive"
@@ -296,16 +357,20 @@ function onBreakpointChanged(newBreakpoint: string, newLayout: LayoutEntry[]) {
 
 <style scoped>
 .grid-canvas {
-  /* border: 1px dashed var(--border-subtle);
-  border-radius: 8px; */
+  height: 100%;
+  min-height: 0;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
   padding: 8px;
   background: var(--bg-base);
 }
 
 :deep(.vue-grid-layout) {
+  height: 100%;
+  min-height: 100%;
   background: var(--bg-subtle);
   border-radius: 8px;
-  min-height: 180px;
 }
 
 :deep(.vue-grid-item:not(.vue-grid-placeholder)) {
