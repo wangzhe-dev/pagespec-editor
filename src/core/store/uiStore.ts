@@ -11,7 +11,7 @@ export interface ToastMessage {
 }
 
 export const useUIStore = defineStore('ui', () => {
-  const theme = ref<'light' | 'dark'>('dark');
+  const theme = ref<'light' | 'dark'>('light');
   const showWelcome = ref(true);
   const toasts = ref<ToastMessage[]>([]);
 

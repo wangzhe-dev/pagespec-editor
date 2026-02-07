@@ -2,22 +2,22 @@
    PageSpec Editor - Global Styles
    ============================================================================ */
 
-/* CSS Variables - Dark Theme (default) */
+/* CSS Variables - Light Theme (default) */
 :root {
   /* Background colors */
-  --bg-base: #0d0d0d;
-  --bg-elevated: #141414;
-  --bg-subtle: #1a1a1a;
-  --bg-hover: #222222;
+  --bg-base: #ffffff;
+  --bg-elevated: #f8f9fa;
+  --bg-subtle: #f1f3f4;
+  --bg-hover: #e8eaed;
 
   /* Text colors */
-  --text-primary: #f5f5f5;
-  --text-secondary: #a3a3a3;
-  --text-muted: #666666;
+  --text-primary: #1a1a1a;
+  --text-secondary: #5f6368;
+  --text-muted: #9aa0a6;
 
   /* Border colors */
-  --border-subtle: #2a2a2a;
-  --border-strong: #3a3a3a;
+  --border-subtle: #e0e0e0;
+  --border-strong: #d0d0d0;
 
   /* Accent colors */
   --accent-primary: #6366f1;
@@ -42,28 +42,32 @@
   --transition-normal: 0.15s ease;
 
   /* Shadows */
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
-  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.3);
-  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.4);
-}
-
-/* Light Theme */
-.light {
-  --bg-base: #ffffff;
-  --bg-elevated: #f8f9fa;
-  --bg-subtle: #f1f3f4;
-  --bg-hover: #e8eaed;
-
-  --text-primary: #1a1a1a;
-  --text-secondary: #5f6368;
-  --text-muted: #9aa0a6;
-
-  --border-subtle: #e0e0e0;
-  --border-strong: #d0d0d0;
-
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.1);
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.1);
   --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.15);
+}
+
+/* Dark Theme */
+.dark {
+  /* Background colors */
+  --bg-base: #0d0d0d;
+  --bg-elevated: #141414;
+  --bg-subtle: #1a1a1a;
+  --bg-hover: #222222;
+
+  /* Text colors */
+  --text-primary: #f5f5f5;
+  --text-secondary: #a3a3a3;
+  --text-muted: #666666;
+
+  /* Border colors */
+  --border-subtle: #2a2a2a;
+  --border-strong: #3a3a3a;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.4);
 }
 
 /* Reset */
