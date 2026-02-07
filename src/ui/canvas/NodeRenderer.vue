@@ -38,7 +38,7 @@ function removeNode(): void {
 <template>
   <div v-if="!node" class="node-missing">节点不存在：{{ nodeId }}</div>
 
-  <!-- <article v-else-if="isLeaf(node)" class="leaf-shell" :class="{ selected: isSelected }" @click.stop="selectNode">
+  <article v-else-if="isLeaf(node)" class="leaf-shell" :class="{ selected: isSelected }" @click.stop="selectNode">
     <header class="leaf-header">
       <span class="leaf-type">{{ node.type }}</span>
       <code>{{ node.leafMeta.componentRef }}</code>
@@ -46,7 +46,7 @@ function removeNode(): void {
     </header>
     <p v-if="node.leafMeta.description" class="leaf-desc">{{ node.leafMeta.description }}</p>
     <p v-if="leafFieldSummary" class="leaf-fields">{{ leafFieldSummary }}</p>
-  </article> -->
+  </article>
 
   <section
     v-else-if="isContainer(node)"

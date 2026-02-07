@@ -100,7 +100,6 @@ function onLayoutUpdated(newLayout: Array<{ i: string; x: number; y: number; w: 
       >
         <div class="grid-item-content">
           <div class="grid-item-toolbar">
-            <span class="grid-item-id">{{ item.i }}</span>
             <button class="remove-btn" @click.stop="removeItem(item.i)">×</button>
           </div>
           <div class="grid-item-child">
