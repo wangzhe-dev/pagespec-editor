@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { isContainer } from '@/core/model/guards';
 import { useSpecStore } from '@/core/store';
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, provide, ref, watch } from 'vue';
 import { GridItem, GridLayout } from 'vue-grid-layout-v3';
 import GridItemShell from './GridItemShell.vue';
 
@@ -20,7 +20,7 @@ interface LayoutEntry {
   minW?: number;
 }
 
-const props = defineProps<{ gridId: string }>();
+const props = defineProps<{ gridId: string; compact?: boolean }>();
 
 const specStore = useSpecStore();
 
@@ -63,7 +63,9 @@ const cols = computed<Record<Breakpoint, number>>(() => {
 
 const draggable = ref(true);
 const resizable = ref(true);
-const responsive = ref(true);
+// Nested (compact) grids always use 'lg' columns – responsive breakpoints
+// make no sense when width is determined by the parent item.
+const responsive = ref(!props.compact);
 const activeBreakpoint = ref<Breakpoint>('lg');
 const layoutModel = ref<LayoutEntry[]>([]);
 const responsiveLayouts = ref<Record<Breakpoint, LayoutEntry[]>>({
@@ -76,8 +78,14 @@ const responsiveLayouts = ref<Record<Breakpoint, LayoutEntry[]>>({
 const canvasEl = ref<HTMLElement | null>(null);
 const canvasHeight = ref(0);
 
+// Provide grid config so child GridItemShells can compute auto-height
+provide('gridConfiguredRowHeight', configuredRowHeight);
+provide('gridMargin', margin);
+
 const occupiedRows = computed(() => {
   const maxRow = items.value.reduce((acc, item) => Math.max(acc, item.y + item.h), 0);
+  // Nested (compact) grids size by content; root grids keep a minimum row count
+  if (props.compact) return Math.max(1, maxRow);
   return Math.max(DEFAULT_ROWS, maxRow);
 });
 
@@ -224,7 +232,13 @@ function rebuildResponsiveLayouts(): void {
   layoutModel.value = cloneLayout(nextLayouts[activeBreakpoint.value] || nextLayouts.lg);
 }
 
-watch([layoutBlueprint, cols], () => {
+// Use a stable key so that non-geometry spec changes (e.g. childId swap)
+// do NOT trigger a rebuild that would wipe un-persisted layout adjustments.
+const layoutStableKey = computed(() =>
+  JSON.stringify(layoutBlueprint.value) + '|' + JSON.stringify(cols.value),
+);
+
+watch(layoutStableKey, () => {
   rebuildResponsiveLayouts();
 }, { immediate: true });
 
@@ -240,35 +254,49 @@ function onLayoutUpdated(newLayout: Array<{ i: string; x: number; y: number; w: 
     [activeBreakpoint.value]: cloneLayout(newLayout),
   };
 
-  // Persist schema geometry with lg as source of truth.
-  if (activeBreakpoint.value !== 'lg') return;
+  // Always persist – if at a non-'lg' breakpoint, scale positions/widths
+  // back to 'lg' columns so the store stays the single source of truth.
+  const bp = activeBreakpoint.value;
+  const bpCols = cols.value[bp];
+  const lgCols = cols.value.lg;
 
   for (const entry of newLayout) {
-    specStore.updateGridItemGeometry(props.gridId, entry.i, {
-      x: entry.x,
-      y: entry.y,
-      w: entry.w,
-      h: entry.h,
-    });
+    if (bp === 'lg') {
+      specStore.updateGridItemGeometry(props.gridId, entry.i, {
+        x: entry.x,
+        y: entry.y,
+        w: entry.w,
+        h: entry.h,
+      });
+    } else {
+      // Proportionally scale back to 'lg' column grid
+      const w = Math.max(1, Math.min(lgCols, Math.round((entry.w / bpCols) * lgCols)));
+      const x = Math.max(0, Math.min(lgCols - w, Math.round((entry.x / bpCols) * lgCols)));
+      specStore.updateGridItemGeometry(props.gridId, entry.i, {
+        x,
+        y: entry.y,
+        w,
+        h: entry.h,
+      });
+    }
   }
 }
 
 /**
  * When a GridItem is resized, recalculate the w of other items
  * in the same row (overlapping Y range) to fill the remaining columns.
+ * Works at any breakpoint – uses the active column count.
  */
 function onItemResized(i: string, newH: number, newW: number) {
-  if (activeBreakpoint.value !== 'lg') return;
+  const activeCols = cols.value[activeBreakpoint.value];
 
-  const allItems = items.value;
-  const resized = allItems.find(item => item.itemId === i);
+  const allItems = layoutModel.value;
+  const resized = allItems.find(item => item.i === i);
   if (!resized) return;
-
-  const cols = colNum.value;
 
   // Find items that overlap vertically with the resized item
   const rowSiblings = allItems.filter(other => {
-    if (other.itemId === i) return false;
+    if (other.i === i) return false;
     return other.y < resized.y + newH && other.y + other.h > resized.y;
   });
 
@@ -283,12 +311,16 @@ function onItemResized(i: string, newH: number, newW: number) {
 
   // Redistribute width for items to the right
   const rightStartX = resized.x + newW;
-  const availableWidth = cols - rightStartX;
+  const availableWidth = activeCols - rightStartX;
 
   if (availableWidth < rightItems.length * MIN_W) return;
 
   const totalOrigW = rightItems.reduce((sum, item) => sum + item.w, 0);
   let curX = rightStartX;
+
+  const bp = activeBreakpoint.value;
+  const bpCols = cols.value[bp];
+  const lgCols = cols.value.lg;
 
   for (let j = 0; j < rightItems.length; j++) {
     const item = rightItems[j];
@@ -296,13 +328,19 @@ function onItemResized(i: string, newH: number, newW: number) {
 
     let w: number;
     if (isLast) {
-      w = cols - curX;
+      w = activeCols - curX;
     } else {
       w = Math.round(availableWidth * (item.w / totalOrigW));
     }
     w = Math.max(MIN_W, w);
 
-    specStore.updateGridItemGeometry(props.gridId, item.itemId, { x: curX, w });
+    if (bp === 'lg') {
+      specStore.updateGridItemGeometry(props.gridId, item.i, { x: curX, w });
+    } else {
+      const scaledW = Math.max(1, Math.min(lgCols, Math.round((w / bpCols) * lgCols)));
+      const scaledX = Math.max(0, Math.min(lgCols - scaledW, Math.round((curX / bpCols) * lgCols)));
+      specStore.updateGridItemGeometry(props.gridId, item.i, { x: scaledX, w: scaledW });
+    }
     curX += w;
   }
 }

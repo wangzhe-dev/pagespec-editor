@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, defineAsyncComponent, watch } from 'vue';
+import { computed, defineAsyncComponent, inject, watch, type Ref } from 'vue';
 import { useSpecStore } from '@/core/store';
 import { isContainer, isLeaf, isSlotHost } from '@/core/model/guards';
 import { PALETTE_CONTAINERS, PALETTE_LEAVES } from '@/core/model/defaults';
@@ -75,6 +75,59 @@ function addSubItem() {
 function removeItem() {
   specStore.removeGridItemById(props.gridId, props.itemId);
 }
+
+// ── Auto-height: propagate nested grid content height to parent item ──
+
+const SHELL_HEADER_HEIGHT = 26;
+const NESTED_CANVAS_PADDING_Y = 16;
+
+const parentRowHeight = inject<Ref<number>>('gridConfiguredRowHeight');
+const parentMargin = inject<Ref<[number, number]>>('gridMargin');
+
+const nestedGridNode = computed(() => {
+  const slot = childSlot.value;
+  if (!slot || slot.kind !== 'grid') return null;
+  const node = specStore.currentSpec?.nodes[slot.gridId];
+  if (!node || !isContainer(node) || node.type !== 'grid') return null;
+  return node;
+});
+
+const nestedOccupiedRows = computed(() => {
+  const grid = nestedGridNode.value;
+  if (!grid?.items?.length) return 0;
+  return grid.items.reduce((max, item) => Math.max(max, item.y + item.h), 0);
+});
+
+const neededParentH = computed(() => {
+  const rows = nestedOccupiedRows.value;
+  if (rows <= 0) return 0;
+
+  const nestedRowH = Number(nestedGridNode.value?.props.rowHeight || 30);
+  const nestedMarginRaw = nestedGridNode.value?.props.margin;
+  const nestedMarginY = Array.isArray(nestedMarginRaw) ? Number(nestedMarginRaw[1]) || 8 : 8;
+
+  // Pixel height the nested grid content needs
+  const contentPx =
+    rows * nestedRowH +
+    Math.max(0, rows - 1) * nestedMarginY +
+    NESTED_CANVAS_PADDING_Y +
+    SHELL_HEADER_HEIGHT;
+
+  const pRowH = parentRowHeight?.value ?? 30;
+  const pMarginY = parentMargin?.value?.[1] ?? 8;
+
+  // vue-grid-layout: pixelH = h * rowH + (h-1) * marginY  →  h = (pixelH + marginY) / (rowH + marginY)
+  return Math.max(2, Math.ceil((contentPx + pMarginY) / (pRowH + pMarginY)));
+});
+
+watch(
+  neededParentH,
+  (newH) => {
+    if (newH <= 0) return;
+    specStore.updateGridItemGeometry(props.gridId, props.itemId, { h: newH });
+  },
+  { immediate: true },
+);
 </script>
 
 <template>
@@ -105,7 +158,7 @@ function removeItem() {
       <!-- Slot host container with grid slot -> nested GridCanvas -->
       <template v-if="isSlotHostChild && childSlot">
         <div v-if="childSlot.kind === 'grid'" class="nested-grid" @mousedown.stop @touchstart.stop>
-          <GridCanvas :grid-id="childSlot.gridId" />
+          <GridCanvas :grid-id="childSlot.gridId" compact />
         </div>
         <NodeRenderer v-else-if="childSlot.kind === 'single'" :node-id="childSlot.childId" />
         <div v-else class="empty-slot">
