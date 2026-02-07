@@ -4,6 +4,7 @@ import {
   createContainer,
   createDemoSpec,
   createEmptySpec,
+  createGridContainer,
   createLeaf,
   deleteNodeCascade,
   downgradeGridToSingle,
@@ -12,6 +13,7 @@ import {
   getGridContainer,
   getNode,
   getSlotHost,
+  attachToSlot,
   replaceGridItemChild,
   replaceSingleChild,
   setSlotSingle,
@@ -488,6 +490,48 @@ export const useSpecStore = defineStore('spec', () => {
     settings.value.autoDowngrade = value;
   }
 
+  /** Ensure a slot-host container has an internal grid in its slot. */
+  function ensureContainerGrid(containerId: string): void {
+    if (!currentSpec.value) return;
+    const spec = currentSpec.value;
+    const node = spec.nodes[containerId];
+    if (!node || !isContainer(node) || node.type === 'grid') return;
+    if (!isSlotHost(node)) return;
+    if (node.slot && node.slot.kind !== 'empty') return;
+
+    const innerGridId = createGridContainer(spec);
+    attachToSlot(spec, containerId, { kind: 'grid', gridId: innerGridId });
+    persistCurrent();
+  }
+
+  function applyLayoutPreset(
+    hostId: string,
+    items: Array<{ x: number; y: number; w: number; h: number }>,
+  ): void {
+    if (!currentSpec.value) return;
+    const spec = currentSpec.value;
+
+    // Clear existing slot content
+    clearSlot(spec, hostId);
+    cleanupOrphans(spec);
+
+    // Create grid container and populate with preset items
+    const gridId = createGridContainer(spec);
+    for (const item of items) {
+      const cardId = createContainer(spec, 'card');
+      // Each container child gets its own internal grid
+      const innerGridId = createGridContainer(spec);
+      attachToSlot(spec, cardId, { kind: 'grid', gridId: innerGridId });
+      addGridItem(spec, gridId, cardId, item);
+    }
+
+    // Attach grid to host slot
+    attachToSlot(spec, hostId, { kind: 'grid', gridId });
+
+    selectedId.value = hostId;
+    persistCurrent();
+  }
+
   return {
     currentSpec,
     selectedId,
@@ -523,5 +567,7 @@ export const useSpecStore = defineStore('spec', () => {
     setPromptMode,
     setIncludeGeometry,
     setAutoDowngrade,
+    ensureContainerGrid,
+    applyLayoutPreset,
   };
 });

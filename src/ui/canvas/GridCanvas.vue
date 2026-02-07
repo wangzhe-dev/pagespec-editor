@@ -3,7 +3,9 @@ import { isContainer } from '@/core/model/guards';
 import { useSpecStore } from '@/core/store';
 import { computed, ref } from 'vue';
 import { GridItem, GridLayout } from 'vue-grid-layout-v3';
-import NodeRenderer from './NodeRenderer.vue';
+import GridItemShell from './GridItemShell.vue';
+
+const MIN_W = 2;
 
 const props = defineProps<{ gridId: string }>();
 
@@ -32,6 +34,7 @@ const layout = computed({
       y: item.y,
       w: item.w,
       h: item.h,
+      minW: item.minW ?? MIN_W,
     }));
   },
   set(newLayout: Array<{ i: string; x: number; y: number; w: number; h: number }>) {
@@ -58,10 +61,6 @@ function childIdForItem(itemId: string): string {
   return item?.childId ?? '';
 }
 
-function removeItem(itemId: string) {
-  specStore.removeGridItemById(props.gridId, itemId);
-}
-
 function onLayoutUpdated(newLayout: Array<{ i: string; x: number; y: number; w: number; h: number }>) {
   for (const entry of newLayout) {
     specStore.updateGridItemGeometry(props.gridId, entry.i, {
@@ -70,6 +69,58 @@ function onLayoutUpdated(newLayout: Array<{ i: string; x: number; y: number; w: 
       w: entry.w,
       h: entry.h,
     });
+  }
+}
+
+/**
+ * When a GridItem is resized, recalculate the w of other items
+ * in the same row (overlapping Y range) to fill the remaining columns.
+ */
+function onItemResized(i: string, newH: number, newW: number) {
+  const allItems = items.value;
+  const resized = allItems.find(item => item.itemId === i);
+  if (!resized) return;
+
+  const cols = colNum.value;
+
+  // Find items that overlap vertically with the resized item
+  const rowSiblings = allItems.filter(other => {
+    if (other.itemId === i) return false;
+    return other.y < resized.y + newH && other.y + other.h > resized.y;
+  });
+
+  if (rowSiblings.length === 0) return;
+
+  // Items to the right of the resized item, sorted by x
+  const rightItems = rowSiblings
+    .filter(item => item.x >= resized.x + resized.w)
+    .sort((a, b) => a.x - b.x);
+
+  if (rightItems.length === 0) return;
+
+  // Redistribute width for items to the right
+  const rightStartX = resized.x + newW;
+  const availableWidth = cols - rightStartX;
+
+  if (availableWidth < rightItems.length * MIN_W) return;
+
+  const totalOrigW = rightItems.reduce((sum, item) => sum + item.w, 0);
+  let curX = rightStartX;
+
+  for (let j = 0; j < rightItems.length; j++) {
+    const item = rightItems[j];
+    const isLast = j === rightItems.length - 1;
+
+    let w: number;
+    if (isLast) {
+      w = cols - curX;
+    } else {
+      w = Math.round(availableWidth * (item.w / totalOrigW));
+    }
+    w = Math.max(MIN_W, w);
+
+    specStore.updateGridItemGeometry(props.gridId, item.itemId, { x: curX, w });
+    curX += w;
   }
 }
 </script>
@@ -97,15 +148,14 @@ function onLayoutUpdated(newLayout: Array<{ i: string; x: number; y: number; w: 
         :w="item.w"
         :h="item.h"
         :i="item.i"
+        :min-w="item.minW"
+        @resized="onItemResized"
       >
-        <div class="grid-item-content">
-          <div class="grid-item-toolbar">
-            <button class="remove-btn" @click.stop="removeItem(item.i)">×</button>
-          </div>
-          <div class="grid-item-child">
-            <NodeRenderer :node-id="childIdForItem(item.i)" />
-          </div>
-        </div>
+        <GridItemShell
+          :grid-id="props.gridId"
+          :item-id="item.i"
+          :child-id="childIdForItem(item.i)"
+        />
       </GridItem>
     </GridLayout>
   </div>
@@ -117,27 +167,6 @@ function onLayoutUpdated(newLayout: Array<{ i: string; x: number; y: number; w: 
   border-radius: 8px;
   padding: 8px;
   background: var(--bg-base);
-}
-
-.grid-controls {
-  display: flex;
-  gap: 16px;
-  margin-bottom: 8px;
-  font-size: 13px;
-  color: var(--text-secondary);
-}
-
-.grid-controls label {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  cursor: pointer;
-}
-
-
-
-.columns {
-  columns: 160px;
 }
 
 :deep(.vue-grid-layout) {
@@ -161,50 +190,6 @@ function onLayoutUpdated(newLayout: Array<{ i: string; x: number; y: number; w: 
 
 :deep(.vue-grid-item.resizing) {
   opacity: 0.9;
-}
-
-.grid-item-content {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-}
-
-.grid-item-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 4px 8px;
-  border-bottom: 1px solid var(--border-subtle);
-  background: var(--bg-subtle);
-  flex-shrink: 0;
-}
-
-.grid-item-id {
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--text-muted);
-}
-
-.remove-btn {
-  border: none;
-  background: transparent;
-  color: var(--text-muted);
-  font-size: 16px;
-  line-height: 1;
-  cursor: pointer;
-  padding: 0 4px;
-  border-radius: 4px;
-}
-
-.remove-btn:hover {
-  color: var(--danger);
-  background: rgba(255, 0, 0, 0.08);
-}
-
-.grid-item-child {
-  flex: 1;
-  overflow: auto;
-  padding: 4px;
 }
 
 .grid-fallback {
