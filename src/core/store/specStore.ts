@@ -2,6 +2,7 @@ import { defineStore } from 'pinia';
 import { computed, ref } from 'vue';
 import {
   createContainer,
+  createDemoSpec,
   createEmptySpec,
   createLeaf,
   deleteNodeCascade,
@@ -208,6 +209,13 @@ export const useSpecStore = defineStore('spec', () => {
 
   function createNewSpec(name: string = '新页面'): void {
     const spec = createEmptySpec(name);
+    currentSpec.value = spec;
+    selectedId.value = spec.rootId;
+    persistCurrent();
+  }
+
+  function createDemo(name: string = '示例页面'): void {
+    const spec = createDemoSpec(name);
     currentSpec.value = spec;
     selectedId.value = spec.rootId;
     persistCurrent();
@@ -493,6 +501,7 @@ export const useSpecStore = defineStore('spec', () => {
     settings,
     initialize,
     createNewSpec,
+    createDemo,
     select,
     addToSlot,
     replaceSelected,

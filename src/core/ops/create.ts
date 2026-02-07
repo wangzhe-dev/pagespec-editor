@@ -5,7 +5,7 @@ import {
   DEFAULT_LEAF_META,
   EMPTY_SLOT,
 } from '../model/defaults';
-import { createNodeId, createSpecId, deepClone } from '../model/id';
+import { createGridItemId, createNodeId, createSpecId, deepClone } from '../model/id';
 import { assertOrThrow, touch } from './internal';
 import type { ContainerType, LeafMeta, LeafType, SlotContent, Spec } from '../model/types';
 
@@ -110,6 +110,67 @@ export function createGridContainer(
   touch(spec);
   assertOrThrow(spec, 'createGridContainer');
   return id;
+}
+
+export function createDemoSpec(name: string = '示例页面'): Spec {
+  const rootId = createNodeId();
+  const gridId = createNodeId();
+
+  const demoLeaves = [
+    { id: createNodeId(), type: 'table' as LeafType, ref: 'TableView', x: 0, y: 0, w: 6, h: 4 },
+    { id: createNodeId(), type: 'chart' as LeafType, ref: 'ChartView', x: 6, y: 0, w: 6, h: 4 },
+    { id: createNodeId(), type: 'form' as LeafType, ref: 'FormView', x: 0, y: 4, w: 4, h: 3 },
+    { id: createNodeId(), type: 'kpi' as LeafType, ref: 'KpiCard', x: 4, y: 4, w: 4, h: 3 },
+    { id: createNodeId(), type: 'list' as LeafType, ref: 'ListView', x: 8, y: 4, w: 4, h: 3 },
+  ];
+
+  const nodes: Record<string, any> = {};
+
+  nodes[rootId] = {
+    id: rootId,
+    kind: 'container',
+    type: 'page',
+    props: deepClone(DEFAULT_CONTAINER_PROPS.page),
+    slot: { kind: 'grid' as const, gridId },
+  };
+
+  nodes[gridId] = {
+    id: gridId,
+    kind: 'container',
+    type: 'grid',
+    props: deepClone(DEFAULT_GRID_CONFIG),
+    items: demoLeaves.map(l => ({
+      itemId: createGridItemId(),
+      childId: l.id,
+      x: l.x,
+      y: l.y,
+      w: l.w,
+      h: l.h,
+    })),
+  };
+
+  for (const l of demoLeaves) {
+    nodes[l.id] = {
+      id: l.id,
+      kind: 'leaf',
+      type: l.type,
+      props: {},
+      leafMeta: {
+        ...deepClone(DEFAULT_LEAF_META),
+        componentRef: l.ref,
+      },
+    };
+  }
+
+  const spec: Spec = {
+    version: 1,
+    rootId,
+    nodes,
+    meta: createMeta(name),
+  };
+
+  assertOrThrow(spec, 'createDemoSpec');
+  return spec;
 }
 
 export function attachToSlot(spec: Spec, hostId: string, slot: SlotContent): void {

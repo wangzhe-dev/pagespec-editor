@@ -1,17 +1,13 @@
 <script setup lang="ts">
-import { computed, defineAsyncComponent, onMounted, ref } from 'vue';
+import { computed, ref } from 'vue';
+import { GridLayout, GridItem } from 'vue-grid-layout-v3';
 import { useSpecStore } from '@/core/store';
 import { isContainer } from '@/core/model/guards';
-
-const NodeRenderer = defineAsyncComponent(() => import('./NodeRenderer.vue'));
+import NodeRenderer from './NodeRenderer.vue';
 
 const props = defineProps<{ gridId: string }>();
 
 const specStore = useSpecStore();
-
-const gridLayoutComp = ref<any>(null);
-const gridItemComp = ref<any>(null);
-const pluginMessage = ref('未安装 vue-grid-layout，当前使用回退模式。');
 
 const gridNode = computed(() => {
   const node = specStore.currentSpec?.nodes[props.gridId];
@@ -28,141 +24,105 @@ const items = computed(() => {
   });
 });
 
-const layout = computed(() =>
-  items.value.map(item => ({
-    i: item.itemId,
-    x: item.x,
-    y: item.y,
-    w: item.w,
-    h: item.h,
-  })),
-);
-
-const colNum = computed(() => Number(gridNode.value?.props.colNum || 12));
-const rowHeight = computed(() => Number(gridNode.value?.props.rowHeight || 30));
-const margin = computed(() => {
-  const value = gridNode.value?.props.margin;
-  if (Array.isArray(value) && value.length === 2) {
-    return value as [number, number];
-  }
-  return [8, 8] as [number, number];
-});
-const preventCollision = computed(() => Boolean(gridNode.value?.props.preventCollision ?? true));
-
-const hasPlugin = computed(() => Boolean(gridLayoutComp.value && gridItemComp.value));
-
-async function tryLoadGridPlugin() {
-  try {
-    const moduleName = 'vue-grid-layout';
-    const mod = (await import(/* @vite-ignore */ moduleName)) as any;
-    gridLayoutComp.value = mod.GridLayout || mod.default?.GridLayout || mod.default;
-    gridItemComp.value = mod.GridItem || mod.default?.GridItem;
-
-    if (!gridLayoutComp.value || !gridItemComp.value) {
-      pluginMessage.value = 'vue-grid-layout 已找到，但导出不匹配，使用回退模式。';
-      return;
-    }
-
-    pluginMessage.value = 'vue-grid-layout 已启用。';
-  } catch {
-    pluginMessage.value = '未检测到 vue-grid-layout，使用回退模式。';
-  }
-}
-
-function updateByLayout(nextLayout: Array<{ i: string; x: number; y: number; w: number; h: number }>) {
-  for (const item of nextLayout) {
-    specStore.updateGridItemGeometry(props.gridId, item.i, {
+const layout = computed({
+  get() {
+    return items.value.map(item => ({
+      i: item.itemId,
       x: item.x,
       y: item.y,
       w: item.w,
       h: item.h,
-    });
-  }
+    }));
+  },
+  set(newLayout: Array<{ i: string; x: number; y: number; w: number; h: number }>) {
+    for (const entry of newLayout) {
+      specStore.updateGridItemGeometry(props.gridId, entry.i, {
+        x: entry.x,
+        y: entry.y,
+        w: entry.w,
+        h: entry.h,
+      });
+    }
+  },
+});
+
+const colNum = computed(() => Number(gridNode.value?.props.colNum || 12));
+const rowHeight = computed(() => Number(gridNode.value?.props.rowHeight || 30));
+
+const draggable = ref(true);
+const resizable = ref(true);
+const responsive = ref(false);
+
+function childIdForItem(itemId: string): string {
+  const item = items.value.find(i => i.itemId === itemId);
+  return item?.childId ?? '';
 }
 
 function removeItem(itemId: string) {
   specStore.removeGridItemById(props.gridId, itemId);
 }
 
-function patchGeom(itemId: string, key: 'x' | 'y' | 'w' | 'h', value: string) {
-  const numeric = Number(value);
-  if (!Number.isFinite(numeric)) return;
-  specStore.updateGridItemGeometry(props.gridId, itemId, { [key]: numeric });
+function onLayoutUpdated(newLayout: Array<{ i: string; x: number; y: number; w: number; h: number }>) {
+  for (const entry of newLayout) {
+    specStore.updateGridItemGeometry(props.gridId, entry.i, {
+      x: entry.x,
+      y: entry.y,
+      w: entry.w,
+      h: entry.h,
+    });
+  }
 }
-
-onMounted(() => {
-  tryLoadGridPlugin();
-});
 </script>
 
 <template>
   <div v-if="!gridNode" class="grid-fallback">Grid 节点不存在</div>
 
   <div v-else class="grid-canvas">
-    <p class="grid-plugin-hint">{{ pluginMessage }}</p>
+    <div class="grid-controls">
+      <label><input type="checkbox" v-model="draggable" /> 可拖拽</label>
+      <label><input type="checkbox" v-model="resizable" /> 可缩放</label>
+      <label><input type="checkbox" v-model="responsive" /> 响应式</label>
+    </div>
 
-    <component
-      :is="gridLayoutComp"
-      v-if="hasPlugin"
-      :layout="layout"
+    <div class="grid-info">
+      <div class="columns">
+        <div v-for="item in layout" :key="item.i">
+          <b>{{ item.i }}</b>: [{{ item.x }}, {{ item.y }}, {{ item.w }}, {{ item.h }}]
+        </div>
+      </div>
+    </div>
+
+    <GridLayout
+      v-model:layout="layout"
       :col-num="colNum"
       :row-height="rowHeight"
-      :margin="margin"
-      :is-draggable="true"
-      :is-resizable="true"
+      :is-draggable="draggable"
+      :is-resizable="resizable"
+      :responsive="responsive"
       :vertical-compact="true"
-      :prevent-collision="preventCollision"
-      @layout-updated="updateByLayout"
+      :use-css-transforms="true"
+      @layout-updated="onLayoutUpdated"
     >
-      <component
-        :is="gridItemComp"
-        v-for="item in items"
-        :key="item.itemId"
-        :i="item.itemId"
+      <GridItem
+        v-for="item in layout"
+        :key="item.i"
         :x="item.x"
         :y="item.y"
         :w="item.w"
         :h="item.h"
+        :i="item.i"
       >
-        <div class="grid-item-box">
+        <div class="grid-item-content">
           <div class="grid-item-toolbar">
-            <span>{{ item.itemId }}</span>
-            <button @click.stop="removeItem(item.itemId)">删除</button>
+            <span class="grid-item-id">{{ item.i }}</span>
+            <button class="remove-btn" @click.stop="removeItem(item.i)">×</button>
           </div>
-          <NodeRenderer :node-id="item.childId" />
+          <div class="grid-item-child">
+            <NodeRenderer :node-id="childIdForItem(item.i)" />
+          </div>
         </div>
-      </component>
-    </component>
-
-    <div v-else class="grid-fallback-list">
-      <article v-for="item in items" :key="item.itemId" class="fallback-item">
-        <header>
-          <strong>{{ item.itemId }}</strong>
-          <button @click.stop="removeItem(item.itemId)">删除</button>
-        </header>
-
-        <div class="geom-editor">
-          <label>
-            x
-            <input :value="item.x" @change="patchGeom(item.itemId, 'x', ($event.target as HTMLInputElement).value)" />
-          </label>
-          <label>
-            y
-            <input :value="item.y" @change="patchGeom(item.itemId, 'y', ($event.target as HTMLInputElement).value)" />
-          </label>
-          <label>
-            w
-            <input :value="item.w" @change="patchGeom(item.itemId, 'w', ($event.target as HTMLInputElement).value)" />
-          </label>
-          <label>
-            h
-            <input :value="item.h" @change="patchGeom(item.itemId, 'h', ($event.target as HTMLInputElement).value)" />
-          </label>
-        </div>
-
-        <NodeRenderer :node-id="item.childId" />
-      </article>
-    </div>
+      </GridItem>
+    </GridLayout>
   </div>
 </template>
 
@@ -174,68 +134,100 @@ onMounted(() => {
   background: var(--bg-base);
 }
 
-.grid-plugin-hint {
+.grid-controls {
+  display: flex;
+  gap: 16px;
   margin-bottom: 8px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.grid-controls label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+}
+
+.grid-info {
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  padding: 8px;
+  margin-bottom: 10px;
   font-size: 12px;
   color: var(--text-muted);
 }
 
-.grid-item-box,
-.fallback-item {
-  border: 1px solid var(--border-subtle);
-  border-radius: 8px;
-  background: var(--bg-elevated);
-  padding: 6px;
+.columns {
+  columns: 160px;
 }
 
-.grid-item-toolbar,
-.fallback-item header {
+:deep(.vue-grid-layout) {
+  background: var(--bg-subtle);
+  border-radius: 8px;
+  min-height: 100px;
+}
+
+:deep(.vue-grid-item:not(.vue-grid-placeholder)) {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+:deep(.vue-grid-item.vue-grid-placeholder) {
+  background: var(--accent-primary);
+  opacity: 0.2;
+  border-radius: 6px;
+}
+
+:deep(.vue-grid-item.resizing) {
+  opacity: 0.9;
+}
+
+.grid-item-content {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.grid-item-toolbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 6px;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-subtle);
+  flex-shrink: 0;
 }
 
-.grid-fallback-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+.grid-item-id {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
 }
 
-.geom-editor {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 6px;
-  margin-bottom: 8px;
-}
-
-.geom-editor label {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  font-size: 12px;
-}
-
-.geom-editor input {
-  width: 100%;
-  border: 1px solid var(--border-subtle);
-  border-radius: 4px;
-  background: var(--bg-base);
-  color: var(--text-primary);
-  padding: 2px 4px;
-}
-
-button {
-  border: 1px solid var(--border-strong);
+.remove-btn {
+  border: none;
   background: transparent;
-  color: var(--text-secondary);
-  border-radius: 6px;
-  padding: 2px 8px;
+  color: var(--text-muted);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 4px;
+  border-radius: 4px;
 }
 
-button:hover {
-  border-color: var(--danger);
+.remove-btn:hover {
   color: var(--danger);
+  background: rgba(255, 0, 0, 0.08);
+}
+
+.grid-item-child {
+  flex: 1;
+  overflow: auto;
+  padding: 4px;
 }
 
 .grid-fallback {

@@ -6,7 +6,7 @@ const specStore = useSpecStore();
 const uiStore = useUIStore();
 
 function getStarted() {
-  specStore.createNewSpec('示例页面');
+  specStore.createDemo('示例页面');
   uiStore.hideWelcome();
 }
 </script>
