@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { onMounted, watch } from 'vue';
 import { usePagesStore, useProfilesStore, useUIStore } from '@/app/store';
+import ToastContainer from '@/components/common/ToastContainer.vue';
 import EditorLayout from '@/components/editor/EditorLayout.vue';
 import WelcomeScreen from '@/components/editor/WelcomeScreen.vue';
-import ToastContainer from '@/components/common/ToastContainer.vue';
+import { onMounted, watch } from 'vue';
 
 const pagesStore = usePagesStore();
 const profilesStore = useProfilesStore();
@@ -17,11 +17,11 @@ onMounted(() => {
 });
 
 // 自动保存
-watch(
-  () => [pagesStore.pages, pagesStore.activePageId],
-  () => pagesStore.saveToStorage(),
-  { deep: true },
-);
+// watch(
+//   // () => [pagesStore.pages, pagesStore.activePageId],
+//   // () => pagesStore.saveToStorage(),
+//   // { deep: true },
+// );
 
 watch(
   () => [profilesStore.profiles, profilesStore.activeProfileId],
