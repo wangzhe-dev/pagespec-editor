@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { usePagesStore, useProfilesStore, useUIStore } from '@/app/store';
-import ToastContainer from '@/components/common/ToastContainer.vue';
-import EditorLayout from '@/components/editor/EditorLayout.vue';
-import WelcomeScreen from '@/components/editor/WelcomeScreen.vue';
+import { usePagesStore, useProfilesStore, useUIStore } from '@/core/store';
+import ToastContainer from '@/ui/app/ToastContainer.vue';
+import AppShell from '@/ui/app/AppShell.vue';
+import WelcomeScreen from '@/ui/pages/WelcomeScreen.vue';
 import { onMounted, watch } from 'vue';
 
 const pagesStore = usePagesStore();
@@ -39,7 +39,7 @@ watch(
 <template>
   <div class="app-root">
     <WelcomeScreen v-if="uiStore.showWelcome && pagesStore.pages.length === 0" />
-    <EditorLayout v-else />
+    <AppShell v-else />
     <ToastContainer />
   </div>
 </template>

@@ -1,0 +1,26 @@
+export function readStorage<T>(key: string, fallback: T): T {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return fallback;
+    return JSON.parse(raw) as T;
+  } catch {
+    return fallback;
+  }
+}
+
+export function writeStorage<T>(key: string, value: T): void {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    // ignore quota errors in MVP stage
+  }
+}
+
+export function createThrottledWriter(delay: number = 300) {
+  let timer: ReturnType<typeof setTimeout> | null = null;
+
+  return (task: () => void) => {
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(() => task(), delay);
+  };
+}
