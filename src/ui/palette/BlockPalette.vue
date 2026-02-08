@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { useSpecStore } from '@/core/store';
+import { useDragFromOutside } from '@/ui/canvas/useDragFromOutside';
 
 interface LayoutPreset {
   name: string;
@@ -177,12 +178,38 @@ function applyPreset(preset: LayoutPreset) {
   if (!hostId.value) return;
   specStore.applyLayoutPreset(hostId.value, preset.items);
 }
+
+// ── Drag GridItem from palette into canvas ──
+const { startDrag, endDrag } = useDragFromOutside();
+
+function onDragStart(e: DragEvent) {
+  startDrag({ kind: 'container', type: 'gridItem' });
+  // Required for HTML5 DnD
+  if (e.dataTransfer) {
+    e.dataTransfer.effectAllowed = 'copy';
+    e.dataTransfer.setData('text/plain', 'gridItem');
+  }
+}
+
+function onDragEnd() {
+  endDrag();
+}
 </script>
 
 <template>
   <section class="palette">
     <header class="palette-header">
       <h3>布局</h3>
+      <div
+        class="drag-block"
+        draggable="true"
+        title="拖动到右侧画布添加 GridItem"
+        @dragstart="onDragStart"
+        @dragend="onDragEnd"
+      >
+        <span class="drag-block-icon">+</span>
+        <span class="drag-block-label">GridItem</span>
+      </div>
     </header>
 
     <div class="preset-grid">
@@ -222,6 +249,9 @@ function applyPreset(preset: LayoutPreset) {
 }
 
 .palette-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   margin-bottom: 12px;
 }
 
@@ -229,6 +259,42 @@ function applyPreset(preset: LayoutPreset) {
   font-size: 14px;
   font-weight: 600;
   color: var(--text-primary);
+}
+
+.drag-block {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border: 1px dashed var(--border-strong);
+  border-radius: 6px;
+  background: var(--bg-base);
+  cursor: grab;
+  font-size: 11px;
+  color: var(--text-secondary);
+  user-select: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.drag-block:hover {
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+  box-shadow: 0 0 0 1px var(--accent-primary);
+}
+
+.drag-block:active {
+  cursor: grabbing;
+}
+
+.drag-block-icon {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.drag-block-label {
+  font-size: 11px;
+  white-space: nowrap;
 }
 
 .preset-grid {

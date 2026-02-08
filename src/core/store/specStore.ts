@@ -548,6 +548,21 @@ export const useSpecStore = defineStore('spec', () => {
     persistCurrent();
   }
 
+  function dropIntoGrid(
+    gridId: string,
+    pick: BlockPick,
+    placement: { x: number; y: number; w: number; h: number },
+  ): string | null {
+    if (!currentSpec.value) return null;
+    const spec = currentSpec.value;
+
+    const newChildId = createNodeByPick(spec, pick);
+    addGridItem(spec, gridId, newChildId, placement);
+    selectedId.value = newChildId;
+    persistCurrent();
+    return newChildId;
+  }
+
   function applyLayoutPreset(
     hostId: string,
     items: Array<{ x: number; y: number; w: number; h: number }>,
@@ -613,5 +628,6 @@ export const useSpecStore = defineStore('spec', () => {
     setAutoDowngrade,
     ensureContainerGrid,
     applyLayoutPreset,
+    dropIntoGrid,
   };
 });

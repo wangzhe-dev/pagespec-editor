@@ -3,10 +3,18 @@ import CanvasRoot from '@/ui/canvas/CanvasRoot.vue';
 import InspectorPanel from '@/ui/inspector/InspectorPanel.vue';
 import BlockPalette from '@/ui/palette/BlockPalette.vue';
 import PromptPreview from '@/ui/promptPreview/PromptPreview.vue';
+import { useDragFromOutside } from '@/ui/canvas/useDragFromOutside';
+
+const { updateMouse } = useDragFromOutside();
+
+function onGlobalDragOver(e: DragEvent) {
+  e.preventDefault();
+  updateMouse(e.clientX, e.clientY);
+}
 </script>
 
 <template>
-  <main class="designer-page">
+  <main class="designer-page" @dragover="onGlobalDragOver" @drop.prevent>
     <aside class="panel panel-left">
       <BlockPalette />
     </aside>

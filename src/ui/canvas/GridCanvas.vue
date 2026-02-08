@@ -4,6 +4,12 @@ import { useSpecStore } from '@/core/store';
 import { computed, nextTick, onBeforeUnmount, onMounted, provide, ref, watch } from 'vue';
 import { GridItem, GridLayout } from 'vue-grid-layout-v3';
 import GridItemShell from './GridItemShell.vue';
+import {
+  useDragFromOutside,
+  DROP_ITEM_ID,
+  DEFAULT_DROP_W,
+  DEFAULT_DROP_H,
+} from './useDragFromOutside';
 
 const MIN_W = 2;
 const DEFAULT_ROWS = 12;
@@ -77,6 +83,18 @@ const responsiveLayouts = ref<Record<Breakpoint, LayoutEntry[]>>({
 });
 const canvasEl = ref<HTMLElement | null>(null);
 const canvasHeight = ref(0);
+const gridLayoutRef = ref<any>(null);
+
+// ── External drag-from-outside ──
+const {
+  mouseXY,
+  isDragging,
+  dropResult,
+  registerGrid,
+  unregisterGrid,
+  confirmDrop,
+  findDeepestGrid,
+} = useDragFromOutside();
 
 // Provide grid config so child GridItemShells can compute auto-height
 provide('gridConfiguredRowHeight', configuredRowHeight);
@@ -113,11 +131,20 @@ onMounted(() => {
     }
   }
   nextTick(updateCanvasHeight);
+
+  // Register this grid for external drag-from-outside
+  if (canvasEl.value) {
+    registerGrid(props.gridId, {
+      el: canvasEl.value,
+      getLayoutRef: () => gridLayoutRef.value,
+    });
+  }
 });
 
 onBeforeUnmount(() => {
   resizeObserver?.disconnect();
   resizeObserver = null;
+  unregisterGrid(props.gridId);
 });
 
 watch(canvasEl, (next, prev) => {
@@ -128,6 +155,15 @@ watch(canvasEl, (next, prev) => {
     resizeObserver.observe(next);
   }
   nextTick(updateCanvasHeight);
+
+  // Re-register with drag composable when the canvas element changes
+  if (prev) unregisterGrid(props.gridId);
+  if (next) {
+    registerGrid(props.gridId, {
+      el: next,
+      getLayoutRef: () => gridLayoutRef.value,
+    });
+  }
 });
 
 const layoutBlueprint = computed<LayoutEntry[]>(() => {
@@ -243,6 +279,7 @@ watch(layoutStableKey, () => {
 }, { immediate: true });
 
 function childIdForItem(itemId: string): string {
+  if (itemId === DROP_ITEM_ID) return '';
   const item = items.value.find(i => i.itemId === itemId);
   return item?.childId ?? '';
 }
@@ -261,6 +298,7 @@ function onLayoutUpdated(newLayout: Array<{ i: string; x: number; y: number; w: 
   const lgCols = cols.value.lg;
 
   for (const entry of newLayout) {
+    if (entry.i === DROP_ITEM_ID) continue; // Skip drop placeholder
     if (bp === 'lg') {
       specStore.updateGridItemGeometry(props.gridId, entry.i, {
         x: entry.x,
@@ -288,6 +326,7 @@ function onLayoutUpdated(newLayout: Array<{ i: string; x: number; y: number; w: 
  * Works at any breakpoint – uses the active column count.
  */
 function onItemResized(i: string, newH: number, newW: number) {
+  if (i === DROP_ITEM_ID) return;
   const activeCols = cols.value[activeBreakpoint.value];
 
   const allItems = layoutModel.value;
@@ -350,6 +389,129 @@ function onBreakpointChanged(newBreakpoint: string, newLayout: LayoutEntry[]) {
   activeBreakpoint.value = newBreakpoint;
   layoutModel.value = cloneLayout(newLayout);
 }
+
+// ── External drag: drop target detection + placeholder ──
+
+const dropTargetGridId = computed(() => {
+  if (!isDragging.value) return null;
+  return findDeepestGrid(mouseXY.x, mouseXY.y);
+});
+
+const isDropTarget = computed(() => dropTargetGridId.value === props.gridId);
+
+let dragStarted = false;
+const lastDropPos = ref<{ x: number; y: number } | null>(null);
+
+// Add / remove the temporary '__drop__' placeholder item
+watch(isDropTarget, (active) => {
+  if (active) {
+    const hasDropItem = layoutModel.value.some(item => item.i === DROP_ITEM_ID);
+    if (!hasDropItem) {
+      const activeCols = cols.value[activeBreakpoint.value];
+      const dropW = Math.min(DEFAULT_DROP_W, activeCols);
+      layoutModel.value = [
+        ...layoutModel.value,
+        { i: DROP_ITEM_ID, x: 0, y: 0, w: dropW, h: DEFAULT_DROP_H, minW: 1 },
+      ];
+    }
+    dragStarted = false;
+  } else {
+    // Clean up placeholder (guard: might already be removed by dropResult handler)
+    const hasDropItem = layoutModel.value.some(item => item.i === DROP_ITEM_ID);
+    if (hasDropItem) {
+      if (gridLayoutRef.value?.emitter && dragStarted) {
+        const pos = lastDropPos.value || { x: 0, y: 0 };
+        gridLayoutRef.value.emitter.emit('dragEvent', [
+          'dragend', DROP_ITEM_ID, pos.x, pos.y, DEFAULT_DROP_H, DEFAULT_DROP_W,
+        ]);
+      }
+      layoutModel.value = layoutModel.value.filter(item => item.i !== DROP_ITEM_ID);
+    }
+    dragStarted = false;
+    lastDropPos.value = null;
+  }
+});
+
+// Continuously move the placeholder to follow the mouse while this grid is the drop target
+watch(
+  () => isDropTarget.value ? `${mouseXY.x},${mouseXY.y}` : null,
+  () => {
+    if (!isDropTarget.value || !canvasEl.value) return;
+
+    const layoutComp = gridLayoutRef.value;
+    if (!layoutComp?.emitter || !layoutComp.el) return;
+
+    const rect = (layoutComp.el as HTMLElement).getBoundingClientRect();
+    const left = mouseXY.x - rect.left;
+    const top = mouseXY.y - rect.top;
+
+    // Manual calcXY (mirrors vue-grid-layout-v3's GridItem.calcXY)
+    const activeCols = cols.value[activeBreakpoint.value];
+    const containerWidth = rect.width;
+    const colWidth = (containerWidth - margin.value[0] * (activeCols + 1)) / activeCols;
+    const dropW = Math.min(DEFAULT_DROP_W, activeCols);
+
+    let x = Math.round((left - margin.value[0]) / (colWidth + margin.value[0]));
+    let y = Math.round((top - margin.value[1]) / (renderRowHeight.value + margin.value[1]));
+    x = Math.max(0, Math.min(x, activeCols - dropW));
+    y = Math.max(0, y);
+
+    lastDropPos.value = { x, y };
+
+    const eventType = dragStarted ? 'dragmove' : 'dragstart';
+    layoutComp.emitter.emit('dragEvent', [
+      eventType, DROP_ITEM_ID, x, y, DEFAULT_DROP_H, dropW,
+    ]);
+    dragStarted = true;
+  },
+);
+
+// Finalize drop: when dropResult is set for this grid, create the real node
+watch(
+  () => dropResult.value,
+  (result) => {
+    if (!result || result.gridId !== props.gridId) return;
+
+    // Read the resolved position from layoutModel (placeholder is still present)
+    const dropItem = layoutModel.value.find(item => item.i === DROP_ITEM_ID);
+    const activeCols = cols.value[activeBreakpoint.value];
+    const pos = dropItem
+      ? { x: dropItem.x, y: dropItem.y, w: dropItem.w, h: dropItem.h }
+      : {
+          x: lastDropPos.value?.x ?? 0,
+          y: lastDropPos.value?.y ?? 0,
+          w: Math.min(DEFAULT_DROP_W, activeCols),
+          h: DEFAULT_DROP_H,
+        };
+
+    // Emit dragend to clean up grid-layout internal drag state
+    if (gridLayoutRef.value?.emitter) {
+      gridLayoutRef.value.emitter.emit('dragEvent', [
+        'dragend', DROP_ITEM_ID, pos.x, pos.y, pos.h, pos.w,
+      ]);
+    }
+
+    // Remove placeholder from layout
+    layoutModel.value = layoutModel.value.filter(item => item.i !== DROP_ITEM_ID);
+    dragStarted = false;
+    lastDropPos.value = null;
+
+    // Scale back to 'lg' coordinates if at a non-'lg' breakpoint
+    const bp = activeBreakpoint.value;
+    if (bp !== 'lg') {
+      const bpCols = cols.value[bp];
+      const lgCols = cols.value.lg;
+      pos.w = Math.max(1, Math.min(lgCols, Math.round((pos.w / bpCols) * lgCols)));
+      pos.x = Math.max(0, Math.min(lgCols - pos.w, Math.round((pos.x / bpCols) * lgCols)));
+    }
+
+    // Create the real node via store
+    specStore.dropIntoGrid(props.gridId, result.payload, pos);
+
+    // Signal composable that drop is handled
+    confirmDrop();
+  },
+);
 </script>
 
 <template>
@@ -357,6 +519,7 @@ function onBreakpointChanged(newBreakpoint: string, newLayout: LayoutEntry[]) {
 
   <div v-else ref="canvasEl" class="grid-canvas">
     <GridLayout
+      ref="gridLayoutRef"
       v-model:layout="layoutModel"
       :responsive-layouts="responsiveLayouts"
       :col-num="colNum"
@@ -381,9 +544,11 @@ function onBreakpointChanged(newBreakpoint: string, newLayout: LayoutEntry[]) {
         :h="item.h"
         :i="item.i"
         :min-w="item.minW"
+        :class="{ 'drop-ghost': item.i === DROP_ITEM_ID }"
         @resized="onItemResized"
       >
         <GridItemShell
+          v-if="item.i !== DROP_ITEM_ID"
           :grid-id="props.gridId"
           :item-id="item.i"
           :child-id="childIdForItem(item.i)"
@@ -433,5 +598,9 @@ function onBreakpointChanged(newBreakpoint: string, newLayout: LayoutEntry[]) {
   border-radius: 8px;
   padding: 8px;
   color: var(--danger);
+}
+
+:deep(.vue-grid-item.drop-ghost) {
+  opacity: 0 !important;
 }
 </style>
