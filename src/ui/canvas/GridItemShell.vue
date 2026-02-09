@@ -133,6 +133,7 @@ watch(
 <template>
   <div class="grid-item-shell">
     <header class="shell-header">
+      <span class="drag-handle" title="拖拽移动">⠿</span>
       <select
         class="type-select"
         :value="childType"
@@ -198,6 +199,20 @@ watch(
   padding: 3px 6px;
   border-bottom: 1px solid var(--border-subtle);
   background: var(--bg-subtle);
+}
+
+.drag-handle {
+  cursor: grab;
+  color: var(--text-muted);
+  font-size: 14px;
+  line-height: 1;
+  padding: 2px 2px;
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.drag-handle:active {
+  cursor: grabbing;
 }
 
 .type-select {

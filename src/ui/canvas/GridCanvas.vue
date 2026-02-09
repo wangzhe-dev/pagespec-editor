@@ -291,6 +291,11 @@ function onLayoutUpdated(newLayout: Array<{ i: string; x: number; y: number; w: 
     [activeBreakpoint.value]: cloneLayout(newLayout),
   };
 
+  // During external drag the __drop__ placeholder pushes other items around.
+  // Do NOT persist these temporary positions – it would mutate the store,
+  // trigger layoutBlueprint / rebuildResponsiveLayouts, and wipe the placeholder.
+  if (newLayout.some(entry => entry.i === DROP_ITEM_ID)) return;
+
   // Always persist – if at a non-'lg' breakpoint, scale positions/widths
   // back to 'lg' columns so the store stays the single source of truth.
   const bp = activeBreakpoint.value;
@@ -298,7 +303,6 @@ function onLayoutUpdated(newLayout: Array<{ i: string; x: number; y: number; w: 
   const lgCols = cols.value.lg;
 
   for (const entry of newLayout) {
-    if (entry.i === DROP_ITEM_ID) continue; // Skip drop placeholder
     if (bp === 'lg') {
       specStore.updateGridItemGeometry(props.gridId, entry.i, {
         x: entry.x,
@@ -432,7 +436,9 @@ watch(isDropTarget, (active) => {
   }
 });
 
-// Continuously move the placeholder to follow the mouse while this grid is the drop target
+// Continuously move the placeholder to follow the mouse while this grid is the drop target.
+// flush: 'post' ensures the GridLayout has processed the __drop__ item in its internal
+// state.layout before we emit drag events on its emitter.
 watch(
   () => isDropTarget.value ? `${mouseXY.x},${mouseXY.y}` : null,
   () => {
@@ -464,6 +470,7 @@ watch(
     ]);
     dragStarted = true;
   },
+  { flush: 'post' },
 );
 
 // Finalize drop: when dropResult is set for this grid, create the real node
@@ -544,6 +551,7 @@ watch(
         :h="item.h"
         :i="item.i"
         :min-w="item.minW"
+        :drag-handle="'.drag-handle'"
         :class="{ 'drop-ghost': item.i === DROP_ITEM_ID }"
         @resized="onItemResized"
       >
