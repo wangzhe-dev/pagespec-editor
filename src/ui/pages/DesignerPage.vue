@@ -1,16 +1,44 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import CanvasRoot from '@/ui/canvas/CanvasRoot.vue';
 import InspectorPanel from '@/ui/inspector/InspectorPanel.vue';
 import BlockPalette from '@/ui/palette/BlockPalette.vue';
 import PromptPreview from '@/ui/promptPreview/PromptPreview.vue';
 import { useDragFromOutside } from '@/ui/canvas/useDragFromOutside';
+import { useSpecStore, useUIStore } from '@/core/store';
+import { buildPrompt } from '@/core/prompt';
 
+const specStore = useSpecStore();
+const uiStore = useUIStore();
 const { updateMouse } = useDragFromOutside();
 
 function onGlobalDragOver(e: DragEvent) {
   e.preventDefault();
   updateMouse(e.clientX, e.clientY);
+}
+
+// ── Copy DSL ──
+
+const specName = computed(() => specStore.currentSpec?.meta.name ?? '');
+
+async function copyDsl() {
+  if (!specStore.currentSpec) return;
+  const result = buildPrompt(specStore.currentSpec, {
+    mode: 'long',
+    includeGeometry: true,
+  });
+  try {
+    await navigator.clipboard.writeText(result.rawText);
+    uiStore.showToast('success', 'DSL 已复制');
+  } catch {
+    uiStore.showToast('error', '复制失败');
+  }
+}
+
+// ── Clear layout ──
+
+function clearLayout() {
+  specStore.createNewSpec(specName.value || '新页面');
 }
 
 // ── Resizable bottom panel ──
@@ -58,7 +86,20 @@ function startResize(e: MouseEvent) {
 
     <section ref="mainRef" class="panel-main" :class="{ resizing: isResizing }">
       <div class="main-canvas" :style="{ flex: canvasFlex }">
-        <CanvasRoot />
+        <header class="canvas-header">
+          <span class="header-name">{{ specName || 'Untitled' }}</span>
+          <button class="header-btn copy-btn" @click="copyDsl" title="复制 DSL">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            复制 DSL
+          </button>
+          <button class="header-btn clear-btn" @click="clearLayout" title="清空布局">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+            清空
+          </button>
+        </header>
+        <div class="canvas-body">
+          <CanvasRoot />
+        </div>
       </div>
       <div class="resize-handle" @mousedown="startResize">
         <div class="resize-grip" />
@@ -77,7 +118,8 @@ function startResize(e: MouseEvent) {
 <style scoped>
 .designer-page {
   display: flex;
-  height: 100vh;
+  flex: 1;
+  min-height: 0;
   gap: 8px;
   padding: 8px;
   background: var(--bg-base);
@@ -120,8 +162,67 @@ function startResize(e: MouseEvent) {
   background: var(--bg-elevated);
   border: 1px solid var(--border-subtle);
   border-radius: 10px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Canvas header ── */
+
+.canvas-header {
+  flex-shrink: 0;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-subtle);
+  border-radius: 10px 10px 0 0;
+}
+
+.header-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-right: auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.header-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  font-size: 12px;
+  padding: 3px 8px;
+  border-radius: 5px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s;
+}
+
+.header-btn:hover {
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+}
+
+.clear-btn:hover {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.canvas-body {
+  flex: 1;
+  min-height: 0;
   overflow: auto;
 }
+
+/* ── Preview & resize ── */
 
 .main-preview {
   flex: 2;
@@ -131,8 +232,6 @@ function startResize(e: MouseEvent) {
   border-radius: 10px;
   overflow: auto;
 }
-
-/* ── Resize handle ── */
 
 .resize-handle {
   flex-shrink: 0;

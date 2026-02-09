@@ -131,7 +131,7 @@ watch(
 </script>
 
 <template>
-  <div class="grid-item-shell">
+  <div class="grid-item-shell" @click="specStore.select(props.childId)">
     <header class="shell-header">
       <span class="drag-handle" title="拖拽移动">⠿</span>
       <select

@@ -552,7 +552,10 @@ watch(
         :i="item.i"
         :min-w="item.minW"
         :drag-handle="'.drag-handle'"
-        :class="{ 'drop-ghost': item.i === DROP_ITEM_ID }"
+        :class="{
+          'drop-ghost': item.i === DROP_ITEM_ID,
+          'item-selected': item.i !== DROP_ITEM_ID && childIdForItem(item.i) === specStore.selectedId,
+        }"
         @resized="onItemResized"
       >
         <GridItemShell
@@ -606,6 +609,10 @@ watch(
   border-radius: 8px;
   padding: 8px;
   color: var(--danger);
+}
+
+:deep(.vue-grid-item.item-selected) {
+  border: 2px solid var(--accent-primary) !important;
 }
 
 :deep(.vue-grid-item.drop-ghost) {

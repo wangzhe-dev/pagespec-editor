@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { computed } from 'vue';
 import { buildPrompt } from '@/core/prompt';
 import { useSpecStore } from '@/core/store';
+import { computed } from 'vue';
 import CopyBar from './CopyBar.vue';
 
 const specStore = useSpecStore();
