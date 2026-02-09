@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { computed } from 'vue';
 import { useSpecStore } from '@/core/store';
 import { useDragFromOutside } from '@/ui/canvas/useDragFromOutside';
+import { computed } from 'vue';
 
 interface LayoutPreset {
   name: string;
@@ -15,6 +15,7 @@ interface LayoutPreset {
 }
 
 const LAYOUT_PRESETS: LayoutPreset[] = [
+
   {
     name: 'top-bottom',
     label: '上下',
@@ -164,6 +165,153 @@ const LAYOUT_PRESETS: LayoutPreset[] = [
       { col: '1', row: '1' },
       { col: '1', row: '2' },
       { col: '2', row: '1 / 3' },
+    ],
+  },
+
+    {
+    name: '3x3',
+    label: '3×3',
+    desc: '三列三行九宫格',
+    items: [
+      { x: 0, y: 0, w: 4, h: 4 },
+      { x: 4, y: 0, w: 4, h: 4 },
+      { x: 8, y: 0, w: 4, h: 4 },
+      { x: 0, y: 4, w: 4, h: 4 },
+      { x: 4, y: 4, w: 4, h: 4 },
+      { x: 8, y: 4, w: 4, h: 4 },
+      { x: 0, y: 8, w: 4, h: 4 },
+      { x: 4, y: 8, w: 4, h: 4 },
+      { x: 8, y: 8, w: 4, h: 4 },
+    ],
+    previewCols: '1fr 1fr 1fr',
+    previewRows: '1fr 1fr 1fr',
+    preview: [
+      { col: '1', row: '1' },
+      { col: '2', row: '1' },
+      { col: '3', row: '1' },
+      { col: '1', row: '2' },
+      { col: '2', row: '2' },
+      { col: '3', row: '2' },
+      { col: '1', row: '3' },
+      { col: '2', row: '3' },
+      { col: '3', row: '3' },
+    ],
+  },
+  {
+    name: '3x2',
+    label: '3×2',
+    desc: '三列两行六宫格',
+    items: [
+      { x: 0, y: 0, w: 4, h: 6 },
+      { x: 4, y: 0, w: 4, h: 6 },
+      { x: 8, y: 0, w: 4, h: 6 },
+      { x: 0, y: 6, w: 4, h: 6 },
+      { x: 4, y: 6, w: 4, h: 6 },
+      { x: 8, y: 6, w: 4, h: 6 },
+    ],
+    previewCols: '1fr 1fr 1fr',
+    previewRows: '1fr 1fr',
+    preview: [
+      { col: '1', row: '1' },
+      { col: '2', row: '1' },
+      { col: '3', row: '1' },
+      { col: '1', row: '2' },
+      { col: '2', row: '2' },
+      { col: '3', row: '2' },
+    ],
+  },
+  {
+    name: '4x2',
+    label: '4×2',
+    desc: '四列两行八宫格',
+    items: [
+      { x: 0, y: 0, w: 3, h: 6 },
+      { x: 3, y: 0, w: 3, h: 6 },
+      { x: 6, y: 0, w: 3, h: 6 },
+      { x: 9, y: 0, w: 3, h: 6 },
+      { x: 0, y: 6, w: 3, h: 6 },
+      { x: 3, y: 6, w: 3, h: 6 },
+      { x: 6, y: 6, w: 3, h: 6 },
+      { x: 9, y: 6, w: 3, h: 6 },
+    ],
+    previewCols: '1fr 1fr 1fr 1fr',
+    previewRows: '1fr 1fr',
+    preview: [
+      { col: '1', row: '1' },
+      { col: '2', row: '1' },
+      { col: '3', row: '1' },
+      { col: '4', row: '1' },
+      { col: '1', row: '2' },
+      { col: '2', row: '2' },
+      { col: '3', row: '2' },
+      { col: '4', row: '2' },
+    ],
+  },
+  {
+    name: 'top1-mid3-bottom1',
+    label: '上1中3下1',
+    desc: '上下一整行，中间三列',
+    items: [
+      { x: 0, y: 0, w: 12, h: 3 },
+      { x: 0, y: 3, w: 4, h: 6 },
+      { x: 4, y: 3, w: 4, h: 6 },
+      { x: 8, y: 3, w: 4, h: 6 },
+      { x: 0, y: 9, w: 12, h: 3 },
+    ],
+    previewCols: '1fr 1fr 1fr',
+    previewRows: '0.8fr 1.6fr 0.8fr',
+    preview: [
+      { col: '1 / 4', row: '1' },
+      { col: '1', row: '2' },
+      { col: '2', row: '2' },
+      { col: '3', row: '2' },
+      { col: '1 / 4', row: '3' },
+    ],
+  },
+  {
+    name: 'top1-mid2-bottom3',
+    label: '上1中2下3',
+    desc: '上方一整行，中间两列，下方三列',
+    items: [
+      { x: 0, y: 0, w: 12, h: 3 },
+      { x: 0, y: 3, w: 6, h: 4 },
+      { x: 6, y: 3, w: 6, h: 4 },
+      { x: 0, y: 7, w: 4, h: 5 },
+      { x: 4, y: 7, w: 4, h: 5 },
+      { x: 8, y: 7, w: 4, h: 5 },
+    ],
+    previewCols: '1fr 1fr 1fr 1fr 1fr 1fr',
+    previewRows: '0.8fr 1fr 1.2fr',
+    preview: [
+      { col: '1 / 7', row: '1' },
+      { col: '1 / 4', row: '2' },
+      { col: '4 / 7', row: '2' },
+      { col: '1 / 3', row: '3' },
+      { col: '3 / 5', row: '3' },
+      { col: '5 / 7', row: '3' },
+    ],
+  },
+  {
+    name: 'top3-mid2-bottom1',
+    label: '上3中2下1',
+    desc: '上方三列，中间两列，下方一整行',
+    items: [
+      { x: 0, y: 0, w: 4, h: 4 },
+      { x: 4, y: 0, w: 4, h: 4 },
+      { x: 8, y: 0, w: 4, h: 4 },
+      { x: 0, y: 4, w: 6, h: 4 },
+      { x: 6, y: 4, w: 6, h: 4 },
+      { x: 0, y: 8, w: 12, h: 4 },
+    ],
+    previewCols: '1fr 1fr 1fr 1fr 1fr 1fr',
+    previewRows: '1fr 1fr 1fr',
+    preview: [
+      { col: '1 / 3', row: '1' },
+      { col: '3 / 5', row: '1' },
+      { col: '5 / 7', row: '1' },
+      { col: '1 / 4', row: '2' },
+      { col: '4 / 7', row: '2' },
+      { col: '1 / 7', row: '3' },
     ],
   },
 ];
