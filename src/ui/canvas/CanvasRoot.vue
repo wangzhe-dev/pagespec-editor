@@ -33,7 +33,7 @@ watch(
 <template>
   <section class="canvas-root">
     <div v-if="!rootId" class="canvas-empty">暂无规格，先在左侧创建或从欢迎页开始。</div>
-    <GridCanvas v-else-if="rootGridId" class="canvas-grid" :grid-id="rootGridId" />
+    <GridCanvas v-else-if="rootGridId" :key="rootGridId" class="canvas-grid" :grid-id="rootGridId" />
     <NodeRenderer v-else :node-id="rootId" />
   </section>
 </template>
