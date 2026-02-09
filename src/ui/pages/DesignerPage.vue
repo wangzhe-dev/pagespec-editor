@@ -46,9 +46,16 @@ function clearLayout() {
 const mainRef = ref<HTMLElement | null>(null);
 const canvasFlex = ref(8);
 const previewFlex = ref(2);
+const isPreviewCollapsed = ref(true);
 const isResizing = ref(false);
 
+function setPreviewCollapsed(value: boolean) {
+  isPreviewCollapsed.value = value;
+}
+
 function startResize(e: MouseEvent) {
+  if (isPreviewCollapsed.value) return;
+
   e.preventDefault();
   const mainEl = mainRef.value;
   if (!mainEl) return;
@@ -101,11 +108,13 @@ function startResize(e: MouseEvent) {
           <CanvasRoot />
         </div>
       </div>
-      <div class="resize-handle" @mousedown="startResize">
+
+      <div v-if="!isPreviewCollapsed" class="resize-handle" @mousedown="startResize">
         <div class="resize-grip" />
       </div>
-      <div class="main-preview" :style="{ flex: previewFlex }">
-        <PromptPreview />
+
+      <div class="main-preview" :class="{ collapsed: isPreviewCollapsed }" :style="!isPreviewCollapsed ? { flex: previewFlex } : undefined">
+        <PromptPreview :collapsed="isPreviewCollapsed" @update:collapsed="setPreviewCollapsed" />
       </div>
     </section>
 
@@ -120,27 +129,48 @@ function startResize(e: MouseEvent) {
   display: flex;
   flex: 1;
   min-height: 0;
-  gap: 8px;
-  padding: 8px;
-  background: var(--bg-base);
+  gap: 12px;
+  padding: 12px;
+  background: transparent;
 }
 
 .panel {
-  background: var(--bg-elevated);
+  position: relative;
+  background: linear-gradient(180deg, rgba(var(--accent-primary-rgb), 0.06) 0%, var(--bg-elevated) 24%, var(--bg-elevated) 100%);
   border: 1px solid var(--border-subtle);
-  border-radius: 10px;
+  border-radius: 14px;
   min-height: 0;
   min-width: 0;
   overflow: auto;
+  box-shadow:
+    0 14px 36px rgba(15, 23, 42, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.38);
+  transition: border-color var(--transition-normal), box-shadow var(--transition-normal), transform var(--transition-normal);
+}
+
+.panel::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.7), transparent);
+  pointer-events: none;
+}
+
+.panel:hover {
+  border-color: color-mix(in srgb, var(--accent-primary) 26%, var(--border-subtle) 74%);
+  box-shadow:
+    0 18px 42px rgba(15, 23, 42, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.45);
 }
 
 .panel-left {
-  width: 300px;
+  width: clamp(260px, 21vw, 320px);
   flex-shrink: 0;
 }
 
 .panel-right {
-  width: 340px;
+  width: clamp(300px, 24vw, 370px);
   flex-shrink: 0;
 }
 
@@ -149,7 +179,7 @@ function startResize(e: MouseEvent) {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 0;
+  gap: 10px;
 }
 
 .panel-main.resizing {
@@ -159,31 +189,34 @@ function startResize(e: MouseEvent) {
 .main-canvas {
   flex: 8;
   min-height: 0;
-  background: var(--bg-elevated);
+  background: linear-gradient(180deg, rgba(var(--accent-primary-rgb), 0.03), var(--bg-elevated) 16%);
   border: 1px solid var(--border-subtle);
-  border-radius: 10px;
+  border-radius: 14px;
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.1);
 }
 
 /* ── Canvas header ── */
 
 .canvas-header {
   flex-shrink: 0;
-  height: 36px;
+  min-height: 44px;
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 0 12px;
+  padding: 6px 14px;
   border-bottom: 1px solid var(--border-subtle);
-  background: var(--bg-subtle);
-  border-radius: 10px 10px 0 0;
+  background: linear-gradient(180deg, rgba(var(--accent-primary-rgb), 0.12) 0%, rgba(var(--accent-primary-rgb), 0.03) 100%);
+  border-radius: 14px 14px 0 0;
+  box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.35);
 }
 
 .header-name {
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 700;
+  letter-spacing: 0.01em;
   color: var(--text-primary);
   margin-right: auto;
   overflow: hidden;
@@ -194,32 +227,53 @@ function startResize(e: MouseEvent) {
 .header-btn {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
   border: 1px solid var(--border-subtle);
-  background: var(--bg-elevated);
+  background: var(--bg-base);
   color: var(--text-secondary);
   font-size: 12px;
-  padding: 3px 8px;
-  border-radius: 5px;
+  font-weight: 600;
+  padding: 5px 10px;
+  border-radius: 8px;
   cursor: pointer;
   white-space: nowrap;
-  transition: all 0.15s;
+  transition: all var(--transition-normal);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+
+.header-btn svg {
+  transition: transform var(--transition-normal);
+}
+
+.copy-btn {
+  color: var(--accent-primary);
+  border-color: rgba(var(--accent-primary-rgb), 0.28);
+  background: rgba(var(--accent-primary-rgb), 0.08);
 }
 
 .header-btn:hover {
-  border-color: var(--accent-primary);
+  border-color: rgba(var(--accent-primary-rgb), 0.45);
   color: var(--accent-primary);
+  transform: translateY(-1px);
+}
+
+.header-btn:hover svg {
+  transform: scale(1.05);
 }
 
 .clear-btn:hover {
   border-color: var(--danger);
   color: var(--danger);
+  background: var(--danger-subtle);
 }
 
 .canvas-body {
   flex: 1;
   min-height: 0;
   overflow: auto;
+  background:
+    radial-gradient(circle at top right, rgba(var(--accent-primary-rgb), 0.08) 0%, transparent 32%),
+    transparent;
 }
 
 /* ── Preview & resize ── */
@@ -227,15 +281,25 @@ function startResize(e: MouseEvent) {
 .main-preview {
   flex: 2;
   min-height: 0;
-  background: var(--bg-elevated);
+  display: flex;
+  background: linear-gradient(180deg, rgba(var(--accent-primary-rgb), 0.04), var(--bg-elevated) 20%);
   border: 1px solid var(--border-subtle);
-  border-radius: 10px;
-  overflow: auto;
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.1);
+}
+
+.main-preview.collapsed {
+  flex: 0 0 112px;
+  min-height: 112px;
+  border-style: dashed;
+  background: linear-gradient(180deg, rgba(var(--accent-primary-rgb), 0.08), rgba(var(--accent-primary-rgb), 0.02));
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.08);
 }
 
 .resize-handle {
   flex-shrink: 0;
-  height: 8px;
+  height: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -243,28 +307,95 @@ function startResize(e: MouseEvent) {
 }
 
 .resize-grip {
-  width: 40px;
-  height: 4px;
-  border-radius: 2px;
-  background: var(--border-subtle);
-  transition: background 0.15s;
+  width: 56px;
+  height: 6px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(var(--accent-primary-rgb), 0.16), rgba(var(--accent-primary-rgb), 0.42), rgba(var(--accent-primary-rgb), 0.16));
+  transition: transform var(--transition-normal), filter var(--transition-normal);
 }
 
 .resize-handle:hover .resize-grip {
-  background: var(--accent-primary);
+  transform: scaleX(1.08);
+  filter: brightness(1.1);
+}
+
+@keyframes panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.panel {
+  animation: panel-in 260ms ease both;
+}
+
+.panel-left {
+  animation-delay: 40ms;
+}
+
+.panel-main {
+  animation: panel-in 260ms ease both;
+  animation-delay: 90ms;
+}
+
+.panel-right {
+  animation-delay: 130ms;
 }
 
 @media (max-width: 1280px) {
   .designer-page {
     flex-direction: column;
-    height: auto;
-    min-height: 100vh;
+    gap: 10px;
+    padding: 10px;
+    overflow: auto;
   }
 
   .panel-left,
   .panel-right {
     width: 100%;
     flex-shrink: 0;
+    max-height: 280px;
+  }
+
+  .panel-main {
+    min-height: 560px;
+  }
+
+  .main-preview {
+    min-height: 220px;
+  }
+
+  .main-preview.collapsed {
+    flex-basis: 104px;
+    min-height: 104px;
+  }
+}
+
+@media (max-width: 768px) {
+  .canvas-header {
+    padding: 8px 10px;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .header-name {
+    width: 100%;
+    margin-right: 0;
+  }
+
+  .header-btn {
+    flex: 1;
+    justify-content: center;
+  }
+
+  .panel-left,
+  .panel-right {
+    max-height: 240px;
   }
 }
 </style>

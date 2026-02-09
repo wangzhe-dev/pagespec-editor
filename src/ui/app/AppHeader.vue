@@ -22,7 +22,7 @@ function toggleFullscreen() {
 <template>
   <header class="app-header">
     <div class="header-left">
-      <div class="logo">
+      <div class="logo-shell">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
           <rect x="3" y="3" width="7" height="7" rx="1.5" fill="var(--accent-primary)" />
           <rect x="14" y="3" width="7" height="7" rx="1.5" fill="var(--accent-primary)" opacity="0.6" />
@@ -30,8 +30,11 @@ function toggleFullscreen() {
           <rect x="14" y="14" width="7" height="7" rx="1.5" fill="var(--accent-primary)" opacity="0.3" />
         </svg>
       </div>
-      <span class="brand">PageSpec</span>
-      <span class="version">v1.0</span>
+      <div class="brand-block">
+        <span class="brand">PageSpec Studio</span>
+        <span class="subtitle">Structure-First Prompt Builder</span>
+      </div>
+      <span class="version">Beta v1.0</span>
     </div>
 
     <nav class="header-right">
@@ -69,70 +72,105 @@ function toggleFullscreen() {
 <style scoped>
 .app-header {
   flex-shrink: 0;
-  height: 40px;
+  min-height: 56px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 12px;
-  background: var(--bg-elevated);
+  padding: 10px 14px;
+  background: linear-gradient(180deg, rgba(var(--accent-primary-rgb), 0.08) 0%, rgba(var(--accent-primary-rgb), 0.02) 100%);
   border-bottom: 1px solid var(--border-subtle);
+  backdrop-filter: blur(10px);
 }
 
 .header-left {
   display: flex;
   align-items: center;
-  gap: 8px;
+  min-width: 0;
+  gap: 10px;
 }
 
-.logo {
+.logo-shell {
   display: flex;
   align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 11px;
+  border: 1px solid rgba(var(--accent-primary-rgb), 0.24);
+  background: linear-gradient(145deg, rgba(var(--accent-primary-rgb), 0.16), rgba(var(--accent-primary-rgb), 0.05));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35);
+}
+
+.brand-block {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
 }
 
 .brand {
   font-size: 14px;
   font-weight: 700;
+  line-height: 1.1;
   color: var(--text-primary);
-  letter-spacing: -0.02em;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+}
+
+.subtitle {
+  font-size: 11px;
+  color: var(--text-secondary);
+  line-height: 1.2;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
 }
 
 .version {
   font-size: 10px;
-  color: var(--text-muted);
-  background: var(--bg-subtle);
-  padding: 1px 5px;
-  border-radius: 4px;
-  line-height: 1.4;
+  font-weight: 600;
+  color: var(--accent-primary);
+  background: rgba(var(--accent-primary-rgb), 0.13);
+  border: 1px solid rgba(var(--accent-primary-rgb), 0.25);
+  padding: 2px 7px;
+  border-radius: 999px;
+  line-height: 1.3;
+  margin-left: 2px;
+  flex-shrink: 0;
 }
 
 .header-right {
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: 4px;
 }
 
 .icon-btn {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 30px;
-  height: 30px;
-  border: none;
-  background: transparent;
+  width: 32px;
+  height: 32px;
+  border: 1px solid transparent;
+  background: var(--bg-base);
   color: var(--text-secondary);
-  border-radius: 6px;
+  border-radius: 9px;
   cursor: pointer;
-  transition: all var(--transition-fast);
+  transition: all var(--transition-normal);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.4);
 }
 
 .icon-btn:hover {
-  background: var(--bg-hover);
-  color: var(--text-primary);
+  border-color: rgba(var(--accent-primary-rgb), 0.28);
+  background: rgba(var(--accent-primary-rgb), 0.08);
+  color: var(--accent-primary);
+  transform: translateY(-1px);
 }
 
 .divider {
   width: 1px;
-  height: 16px;
+  height: 18px;
   background: var(--border-subtle);
   margin: 0 4px;
 }
@@ -141,19 +179,38 @@ function toggleFullscreen() {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   border: 1.5px solid var(--border-strong);
-  background: var(--bg-subtle);
-  color: var(--text-muted);
-  border-radius: 50%;
+  background: linear-gradient(180deg, var(--bg-base), var(--bg-subtle));
+  color: var(--text-secondary);
+  border-radius: 10px;
   cursor: pointer;
-  margin-left: 4px;
-  transition: all var(--transition-fast);
+  margin-left: 2px;
+  transition: all var(--transition-normal);
 }
 
 .avatar-btn:hover {
-  border-color: var(--accent-primary);
+  border-color: rgba(var(--accent-primary-rgb), 0.35);
   color: var(--accent-primary);
+  background: rgba(var(--accent-primary-rgb), 0.08);
+}
+
+@media (max-width: 980px) {
+  .app-header {
+    min-height: 52px;
+    padding: 8px 10px;
+  }
+
+  .subtitle {
+    display: none;
+  }
+}
+
+@media (max-width: 720px) {
+  .version,
+  .divider {
+    display: none;
+  }
 }
 </style>
