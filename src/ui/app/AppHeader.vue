@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { useUIStore } from '@/core/store';
+import { ElButton, ElTooltip, ElDivider } from 'element-plus';
+import { Keyboard, Maximize2, Sun, Moon, HelpCircle, User } from 'lucide-vue-next';
 
 const uiStore = useUIStore();
 
@@ -38,33 +40,38 @@ function toggleFullscreen() {
     </div>
 
     <nav class="header-right">
-      <!-- Keyboard shortcuts -->
-      <button class="icon-btn" title="快捷键" @click="$emit('show-shortcuts')">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M6 8h.01"/><path d="M10 8h.01"/><path d="M14 8h.01"/><path d="M18 8h.01"/><path d="M6 12h.01"/><path d="M18 12h.01"/><path d="M8 16h8"/></svg>
-      </button>
+      <ElTooltip content="快捷键" placement="bottom" :show-after="400">
+        <ElButton class="icon-btn" text @click="$emit('show-shortcuts')">
+          <Keyboard :size="16" />
+        </ElButton>
+      </ElTooltip>
 
-      <!-- Fullscreen -->
-      <button class="icon-btn" title="全屏" @click="toggleFullscreen">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
-      </button>
+      <ElTooltip content="全屏" placement="bottom" :show-after="400">
+        <ElButton class="icon-btn" text @click="toggleFullscreen">
+          <Maximize2 :size="16" />
+        </ElButton>
+      </ElTooltip>
 
-      <!-- Theme toggle -->
-      <button class="icon-btn" :title="isDark ? '切换亮色' : '切换暗色'" @click="toggleTheme">
-        <svg v-if="isDark" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
-        <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3a7 7 0 0 0 9.79 9.79z"/></svg>
-      </button>
+      <ElTooltip :content="isDark ? '切换亮色' : '切换暗色'" placement="bottom" :show-after="400">
+        <ElButton class="icon-btn" text @click="toggleTheme">
+          <Sun v-if="isDark" :size="16" />
+          <Moon v-else :size="16" />
+        </ElButton>
+      </ElTooltip>
 
-      <div class="divider" />
+      <ElDivider direction="vertical" class="header-divider" />
 
-      <!-- Help / Docs -->
-      <button class="icon-btn" title="帮助文档">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-      </button>
+      <ElTooltip content="帮助文档" placement="bottom" :show-after="400">
+        <ElButton class="icon-btn" text>
+          <HelpCircle :size="16" />
+        </ElButton>
+      </ElTooltip>
 
-      <!-- User avatar -->
-      <button class="avatar-btn" title="用户">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-      </button>
+      <ElTooltip content="用户" placement="bottom" :show-after="400">
+        <ElButton class="avatar-btn" text>
+          <User :size="16" />
+        </ElButton>
+      </ElTooltip>
     </nav>
   </header>
 </template>
@@ -146,51 +153,45 @@ function toggleFullscreen() {
   gap: 4px;
 }
 
-.icon-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
+/* Override ElButton defaults for icon buttons */
+:deep(.icon-btn.el-button) {
   width: 32px;
   height: 32px;
+  padding: 0;
   border: 1px solid transparent;
+  border-radius: 9px;
   background: var(--bg-base);
   color: var(--text-secondary);
-  border-radius: 9px;
-  cursor: pointer;
-  transition: all var(--transition-normal);
   box-shadow: 0 1px 0 rgba(255, 255, 255, 0.4);
+  transition: all var(--transition-normal);
 }
 
-.icon-btn:hover {
+:deep(.icon-btn.el-button:hover) {
   border-color: rgba(var(--accent-primary-rgb), 0.28);
   background: rgba(var(--accent-primary-rgb), 0.08);
   color: var(--accent-primary);
   transform: translateY(-1px);
 }
 
-.divider {
-  width: 1px;
+.header-divider {
   height: 18px;
-  background: var(--border-subtle);
   margin: 0 4px;
 }
 
-.avatar-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
+/* Override ElButton defaults for avatar button */
+:deep(.avatar-btn.el-button) {
   width: 32px;
   height: 32px;
+  padding: 0;
   border: 1.5px solid var(--border-strong);
+  border-radius: 10px;
   background: linear-gradient(180deg, var(--bg-base), var(--bg-subtle));
   color: var(--text-secondary);
-  border-radius: 10px;
-  cursor: pointer;
   margin-left: 2px;
   transition: all var(--transition-normal);
 }
 
-.avatar-btn:hover {
+:deep(.avatar-btn.el-button:hover) {
   border-color: rgba(var(--accent-primary-rgb), 0.35);
   color: var(--accent-primary);
   background: rgba(var(--accent-primary-rgb), 0.08);
@@ -209,7 +210,7 @@ function toggleFullscreen() {
 
 @media (max-width: 720px) {
   .version,
-  .divider {
+  .header-divider {
     display: none;
   }
 }

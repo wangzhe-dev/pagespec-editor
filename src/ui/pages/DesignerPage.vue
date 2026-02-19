@@ -7,6 +7,8 @@ import PromptPreview from '@/ui/promptPreview/PromptPreview.vue';
 import { useDragFromOutside } from '@/ui/canvas/useDragFromOutside';
 import { useSpecStore, useUIStore } from '@/core/store';
 import { buildPrompt } from '@/core/prompt';
+import { ElButton, ElTooltip } from 'element-plus';
+import { Copy, Trash2 } from 'lucide-vue-next';
 
 const specStore = useSpecStore();
 const uiStore = useUIStore();
@@ -95,14 +97,18 @@ function startResize(e: MouseEvent) {
       <div class="main-canvas" :style="{ flex: canvasFlex }">
         <header class="canvas-header">
           <span class="header-name">{{ specName || 'Untitled' }}</span>
-          <button class="header-btn copy-btn" @click="copyDsl" title="复制 DSL">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-            复制 DSL
-          </button>
-          <button class="header-btn clear-btn" @click="clearLayout" title="清空布局">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
-            清空
-          </button>
+          <ElTooltip content="复制 DSL Prompt" placement="bottom" :show-after="400">
+            <ElButton class="header-btn copy-btn" size="small" @click="copyDsl">
+              <Copy :size="14" />
+              复制 DSL
+            </ElButton>
+          </ElTooltip>
+          <ElTooltip content="清空当前布局" placement="bottom" :show-after="400">
+            <ElButton class="header-btn clear-btn" size="small" @click="clearLayout">
+              <Trash2 :size="14" />
+              清空
+            </ElButton>
+          </ElTooltip>
         </header>
         <div class="canvas-body">
           <CanvasRoot />
@@ -224,47 +230,42 @@ function startResize(e: MouseEvent) {
   white-space: nowrap;
 }
 
-.header-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  border: 1px solid var(--border-subtle);
-  background: var(--bg-base);
-  color: var(--text-secondary);
+/* Base header button via ElButton */
+:deep(.header-btn.el-button) {
+  gap: 5px;
   font-size: 12px;
   font-weight: 600;
-  padding: 5px 10px;
   border-radius: 8px;
-  cursor: pointer;
   white-space: nowrap;
-  transition: all var(--transition-normal);
   box-shadow: 0 1px 0 rgba(255, 255, 255, 0.4);
+  transition: all var(--transition-normal);
+  --el-button-bg-color: var(--bg-base);
+  --el-button-border-color: var(--border-subtle);
+  --el-button-text-color: var(--text-secondary);
+  --el-button-hover-border-color: rgba(var(--accent-primary-rgb), 0.45);
+  --el-button-hover-text-color: var(--accent-primary);
+  --el-button-hover-bg-color: var(--bg-base);
 }
 
-.header-btn svg {
-  transition: transform var(--transition-normal);
-}
-
-.copy-btn {
-  color: var(--accent-primary);
-  border-color: rgba(var(--accent-primary-rgb), 0.28);
-  background: rgba(var(--accent-primary-rgb), 0.08);
-}
-
-.header-btn:hover {
-  border-color: rgba(var(--accent-primary-rgb), 0.45);
-  color: var(--accent-primary);
+:deep(.header-btn.el-button:hover) {
   transform: translateY(-1px);
 }
 
-.header-btn:hover svg {
-  transform: scale(1.05);
+/* Copy DSL button */
+:deep(.copy-btn.el-button) {
+  --el-button-bg-color: rgba(var(--accent-primary-rgb), 0.08);
+  --el-button-border-color: rgba(var(--accent-primary-rgb), 0.28);
+  --el-button-text-color: var(--accent-primary);
+  --el-button-hover-bg-color: rgba(var(--accent-primary-rgb), 0.14);
+  --el-button-hover-border-color: rgba(var(--accent-primary-rgb), 0.45);
+  --el-button-hover-text-color: var(--accent-primary);
 }
 
-.clear-btn:hover {
-  border-color: var(--danger);
-  color: var(--danger);
-  background: var(--danger-subtle);
+/* Clear button */
+:deep(.clear-btn.el-button:hover) {
+  --el-button-hover-border-color: var(--danger);
+  --el-button-hover-text-color: var(--danger);
+  --el-button-hover-bg-color: var(--danger-subtle);
 }
 
 .canvas-body {

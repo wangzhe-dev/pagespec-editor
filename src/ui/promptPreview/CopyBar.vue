@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { useSpecStore, useUIStore } from '@/core/store';
+import { ElButton, ElSwitch, ElTooltip } from 'element-plus';
+import { ToggleGroupRoot, ToggleGroupItem } from 'radix-vue';
+import { Copy } from 'lucide-vue-next';
 
 const props = defineProps<{ text: string }>();
 
@@ -40,33 +43,49 @@ async function copyPrompt() {
 
 <template>
   <div class="copy-bar">
+    <!-- Mode toggle group -->
     <div class="mode-group">
       <span class="group-label">Mode</span>
-      <div class="mode-switch" role="group" aria-label="Prompt mode">
-        <button
+      <ToggleGroupRoot
+        class="mode-switch"
+        type="single"
+        :model-value="mode"
+        @update:model-value="(val) => { if (val) mode = val as 'short' | 'long' | 'batch' }"
+      >
+        <ToggleGroupItem
           v-for="item in MODE_OPTIONS"
           :key="item.value"
           class="mode-btn"
-          type="button"
-          :class="{ active: mode === item.value }"
-          @click="mode = item.value"
+          :value="item.value"
         >
           {{ item.label }}
-        </button>
-      </div>
+        </ToggleGroupItem>
+      </ToggleGroupRoot>
     </div>
 
-    <label class="geometry-toggle">
-      <input v-model="includeGeometry" type="checkbox" />
-      <span class="switch-track">
-        <span class="switch-dot" />
-      </span>
-      <span class="toggle-label">Geometry</span>
-    </label>
+    <!-- Geometry switch -->
+    <ElTooltip content="是否包含几何布局信息" placement="top" :show-after="400">
+      <div class="geometry-wrap">
+        <ElSwitch
+          v-model="includeGeometry"
+          size="small"
+          class="geometry-switch"
+        />
+        <span class="toggle-label">Geometry</span>
+      </div>
+    </ElTooltip>
 
-    <button class="copy-btn" type="button" :disabled="!props.text.trim()" @click="copyPrompt">
+    <!-- Copy button -->
+    <ElButton
+      class="copy-btn"
+      type="primary"
+      size="small"
+      :disabled="!props.text.trim()"
+      @click="copyPrompt"
+    >
+      <Copy :size="13" />
       复制 Prompt
-    </button>
+    </ElButton>
   </div>
 </template>
 
@@ -106,19 +125,26 @@ async function copyPrompt() {
   padding: 5px 9px;
   font-size: 12px;
   font-weight: 600;
+  cursor: pointer;
   transition: all var(--transition-normal);
+  outline: none;
 }
 
 .mode-btn:last-child {
   border-right: 0;
 }
 
-.mode-btn.active {
+.mode-btn[data-state='on'] {
   background: rgba(var(--accent-primary-rgb), 0.14);
   color: var(--accent-primary);
 }
 
-.geometry-toggle {
+.mode-btn:hover:not([data-state='on']) {
+  background: var(--bg-subtle);
+  color: var(--text-primary);
+}
+
+.geometry-wrap {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -127,43 +153,7 @@ async function copyPrompt() {
   border-radius: 8px;
   border: 1px solid var(--border-subtle);
   background: var(--bg-base);
-}
-
-.geometry-toggle input {
-  position: absolute;
-  opacity: 0;
-  pointer-events: none;
-}
-
-.switch-track {
-  position: relative;
-  width: 30px;
-  height: 18px;
-  border-radius: 999px;
-  background: var(--bg-hover);
-  border: 1px solid var(--border-subtle);
-  transition: all var(--transition-normal);
-}
-
-.switch-dot {
-  position: absolute;
-  top: 1px;
-  left: 1px;
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: #fff;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
-  transition: transform var(--transition-normal);
-}
-
-.geometry-toggle input:checked + .switch-track {
-  background: rgba(var(--accent-primary-rgb), 0.35);
-  border-color: rgba(var(--accent-primary-rgb), 0.45);
-}
-
-.geometry-toggle input:checked + .switch-track .switch-dot {
-  transform: translateX(12px);
+  cursor: pointer;
 }
 
 .toggle-label {
@@ -171,29 +161,29 @@ async function copyPrompt() {
   color: var(--text-secondary);
 }
 
-.copy-btn {
-  border: 1px solid rgba(var(--accent-primary-rgb), 0.3);
-  border-radius: 8px;
-  background: rgba(var(--accent-primary-rgb), 0.12);
-  color: var(--accent-primary);
-  padding: 5px 10px;
+/* ElSwitch size adjustments */
+:deep(.geometry-switch.el-switch) {
+  --el-switch-on-color: var(--accent-primary);
+  height: 18px;
+}
+
+/* ElButton copy button styling */
+:deep(.copy-btn.el-button) {
+  gap: 5px;
   font-size: 12px;
   font-weight: 700;
-  transition: all var(--transition-normal);
-}
-
-.copy-btn:hover:not(:disabled) {
-  border-color: rgba(var(--accent-primary-rgb), 0.48);
-  background: rgba(var(--accent-primary-rgb), 0.2);
-}
-
-.copy-btn:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
+  border-radius: 8px;
+  --el-button-bg-color: rgba(var(--accent-primary-rgb), 0.12);
+  --el-button-border-color: rgba(var(--accent-primary-rgb), 0.3);
+  --el-button-text-color: var(--accent-primary);
+  --el-button-hover-bg-color: rgba(var(--accent-primary-rgb), 0.2);
+  --el-button-hover-border-color: rgba(var(--accent-primary-rgb), 0.48);
+  --el-button-hover-text-color: var(--accent-primary);
+  --el-button-active-bg-color: rgba(var(--accent-primary-rgb), 0.25);
 }
 
 @media (max-width: 860px) {
-  .geometry-toggle {
+  .geometry-wrap {
     margin-left: 0;
   }
 }
