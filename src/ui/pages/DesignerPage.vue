@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { buildPrompt } from '@/core/prompt';
+import { useSpecStore, useUIStore } from '@/core/store';
 import CanvasRoot from '@/ui/canvas/CanvasRoot.vue';
+import { useDragFromOutside } from '@/ui/canvas/useDragFromOutside';
 import InspectorPanel from '@/ui/inspector/InspectorPanel.vue';
 import BlockPalette from '@/ui/palette/BlockPalette.vue';
 import PromptPreview from '@/ui/promptPreview/PromptPreview.vue';
-import { useDragFromOutside } from '@/ui/canvas/useDragFromOutside';
-import { useSpecStore, useUIStore } from '@/core/store';
-import { buildPrompt } from '@/core/prompt';
+import { computed, ref } from 'vue';
 
 const specStore = useSpecStore();
 const uiStore = useUIStore();
@@ -46,16 +46,9 @@ function clearLayout() {
 const mainRef = ref<HTMLElement | null>(null);
 const canvasFlex = ref(8);
 const previewFlex = ref(2);
-const isPreviewCollapsed = ref(true);
 const isResizing = ref(false);
 
-function setPreviewCollapsed(value: boolean) {
-  isPreviewCollapsed.value = value;
-}
-
 function startResize(e: MouseEvent) {
-  if (isPreviewCollapsed.value) return;
-
   e.preventDefault();
   const mainEl = mainRef.value;
   if (!mainEl) return;
@@ -109,12 +102,12 @@ function startResize(e: MouseEvent) {
         </div>
       </div>
 
-      <div v-if="!isPreviewCollapsed" class="resize-handle" @mousedown="startResize">
+      <div class="resize-handle" @mousedown="startResize">
         <div class="resize-grip" />
       </div>
 
-      <div class="main-preview" :class="{ collapsed: isPreviewCollapsed }" :style="!isPreviewCollapsed ? { flex: previewFlex } : undefined">
-        <PromptPreview :collapsed="isPreviewCollapsed" @update:collapsed="setPreviewCollapsed" />
+      <div class="main-preview" :style="{ flex: previewFlex }">
+        <PromptPreview />
       </div>
     </section>
 
@@ -289,13 +282,6 @@ function startResize(e: MouseEvent) {
   box-shadow: 0 10px 28px rgba(15, 23, 42, 0.1);
 }
 
-.main-preview.collapsed {
-  flex: 0 0 112px;
-  min-height: 112px;
-  border-style: dashed;
-  background: linear-gradient(180deg, rgba(var(--accent-primary-rgb), 0.08), rgba(var(--accent-primary-rgb), 0.02));
-  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.08);
-}
 
 .resize-handle {
   flex-shrink: 0;
@@ -368,11 +354,6 @@ function startResize(e: MouseEvent) {
 
   .main-preview {
     min-height: 220px;
-  }
-
-  .main-preview.collapsed {
-    flex-basis: 104px;
-    min-height: 104px;
   }
 }
 

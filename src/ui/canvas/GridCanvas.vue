@@ -5,10 +5,10 @@ import { computed, nextTick, onBeforeUnmount, onMounted, provide, ref, watch } f
 import { GridItem, GridLayout } from 'vue-grid-layout-v3';
 import GridItemShell from './GridItemShell.vue';
 import {
-  useDragFromOutside,
-  DROP_ITEM_ID,
-  DEFAULT_DROP_W,
   DEFAULT_DROP_H,
+  DEFAULT_DROP_W,
+  DROP_ITEM_ID,
+  useDragFromOutside,
 } from './useDragFromOutside';
 
 const MIN_W = 2;
@@ -576,7 +576,7 @@ watch(
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  padding: 8px;
+  /* padding: 8px; */
   background: var(--bg-base);
 }
 
@@ -584,7 +584,7 @@ watch(
   height: 100%;
   min-height: 100%;
   background: var(--bg-subtle);
-  border-radius: 8px;
+  /* border-radius: 8px; */
 }
 
 :deep(.vue-grid-item:not(.vue-grid-placeholder)) {
